@@ -1,0 +1,151 @@
+# Python compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment directories
+env/
+venv/
+ENV/
+.venv/
+.VENV/
+env.bak/
+env.bak/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# VSCode settings
+.vscode/
+*.code-workspace
+
+# PyCharm settings
+.idea/
+
+# Logs
+logs/
+*.log
+
+# Python environment files
+*.env
+.env
+
+# PyInstaller
+# Usually these files are written by a Python script from a template
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+*.cover
+*.py,cover
+.hypothesis/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Coverage reports
+.coverage
+coverage.xml
+*.cover
+*.py,cover
+.cache
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+build/
+
+# pyenv
+.python-version
+
+# celery beat schedule file
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.env.*
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+
+# Cython debug symbols
+cython_debug/
+
+# Project-specific directories
+log/
+logs/
+results/
+output/
+__MACOSX/
+.DS_Store
+
+# Ignore data files or results
+data/
+*.h5
+*.csv
+*.pkl
+*.npz
+*.npy
+
+# Ignore coverage results
+.coverage
+coverage/
+
+# Ignore model files
+models/
+*.pth
+*.h5
+
+# Ignore Jupyter Notebook temporary files
+*.ipynb_checkpoints
+
+# Ignore video recordings
+*.mp4
+*.avi
+
+# Ignore additional directories or files
+*.bak
+*.swp
+*.tmp
+
+# Ignore specific folders created during development
+tmp/
+temp/
