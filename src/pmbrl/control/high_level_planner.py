@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from pmbrl.control.measures import InformationGain, Disagreement, Variance, Random
+
 class HighLevelPlanner(nn.Module):
     def __init__(
         self,
@@ -38,6 +40,9 @@ class HighLevelPlanner(nn.Module):
         elif strategy == "none":
             self.use_exploration = False
 
+        # Initialize storage for trial rewards and bonuses
+        self.trial_rewards = []
+        self.trial_bonuses = []
         self.to(device)
 
     def forward(self, state):
@@ -60,6 +65,7 @@ class HighLevelPlanner(nn.Module):
             )
 
             # Simulate the outcomes of the goal sequences
+            # delta_means and delta_vars are the changes in states and their variances
             states, delta_vars, delta_means = self.perform_rollout(state, goals)
 
             # Initialize returns (exploration bonuses in this case)
@@ -69,6 +75,24 @@ class HighLevelPlanner(nn.Module):
             if self.use_exploration:
                 expl_bonus = self.measure(delta_means, delta_vars) * self.expl_scale
                 returns += expl_bonus
+                self.trial_bonuses.append(expl_bonus)
+            
+            # Calculate rewards if applicable
+            if self.use_reward:
+                _states = states.view(-1, state_size)
+                _goals = goals.unsqueeze(0).repeat(self.ensemble_size, 1, 1, 1)
+                _goals = _goals.view(-1, self.goal_size)
+                # rewards = self.reward_model(_states, _actions)
+                #TODO: Implement a goal based reward model and use it here
+                rewards = self.reward_model(_goals)
+                rewards = rewards * self.reward_scale
+                rewards = rewards.view(
+                    self.plan_horizon, self.ensemble_size, self.n_candidates
+                )
+                rewards = rewards.mean(dim=1).sum(dim=0)
+                returns += rewards
+                self.trial_rewards.append(rewards)
+
 
             # Refine the goal distribution based on returns (exploration bonuses)
             goal_mean, goal_std_dev = self._fit_gaussian(goals, returns)
