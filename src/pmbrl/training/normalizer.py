@@ -4,7 +4,7 @@
 import numpy as np
 import torch
 
-
+# TODO: Add goals
 class Normalizer(object):
     def __init__(self):
         self.state_mean = None
