@@ -4,12 +4,6 @@ import torch.nn as nn
 from pmbrl.control.measures import InformationGain, Disagreement, Variance, Random
 
 class HighLevelPlanner(nn.Module):
-    """
-    High-level planner responsible for generating high-level goals (contexts) 
-    that guide the low-level planner. The planner uses a model ensemble to 
-    evaluate different goal candidates and selects the most promising ones.
-    """
-
     def __init__(
         self,
         ensemble,
@@ -24,22 +18,6 @@ class HighLevelPlanner(nn.Module):
         strategy="information",
         device="cpu",
     ):
-        """
-        Initialize the HighLevelPlanner.
-
-        Args:
-            ensemble (nn.Module): The ensemble model used for state transitions.
-            goal_size (int): The dimensionality of the goal.
-            ensemble_size (int): Number of models in the ensemble.
-            plan_horizon (int): Number of time steps to plan ahead.
-            optimisation_iters (int): Number of optimization iterations for goal selection.
-            n_candidates (int): Number of goal candidates to evaluate.
-            top_candidates (int): Number of top candidates to select.
-            use_exploration (bool): Whether to include exploration bonuses in goal selection.
-            expl_scale (float): Scaling factor for exploration bonuses.
-            strategy (str): Strategy for exploration ("information", "variance", "random", or "none").
-            device (str): Device to run computations on ("cpu" or "cuda").
-        """
         super().__init__()
         self.ensemble = ensemble
         self.goal_size = goal_size
@@ -68,40 +46,27 @@ class HighLevelPlanner(nn.Module):
         self.to(device)
 
     def forward(self, state):
-        """
-        Generate a high-level goal based on the current state.
-
-        Args:
-            state (np.ndarray): The current state of the environment.
-
-        Returns:
-            torch.Tensor: The selected high-level goal.
-        """
         state = torch.from_numpy(state).float().to(self.device)
         state_size = state.size(0)
 
-        # Initialize mean and standard deviation for goal candidates
+        # Generate high-level goal as context
         goal_mean = torch.zeros(self.plan_horizon, 1, self.goal_size).to(self.device)
         goal_std_dev = torch.ones(self.plan_horizon, 1, self.goal_size).to(self.device)
 
         for _ in range(self.optimisation_iters):
-            # Sample goal candidates from the current Gaussian distribution
             goals = goal_mean + goal_std_dev * torch.randn(
                 self.plan_horizon, self.n_candidates, self.goal_size, device=self.device)
 
-            # Perform rollout simulations with the goal candidates
             states, delta_vars, delta_means = self.perform_rollout(state, goals)
 
-            # Initialize returns (rewards + exploration bonuses)
             returns = torch.zeros(self.n_candidates).float().to(self.device)
 
-            # Calculate exploration bonuses if enabled
             if self.use_exploration:
                 expl_bonus = self.measure(delta_means, delta_vars) * self.expl_scale
                 returns += expl_bonus
                 self.trial_bonuses.append(expl_bonus)
-            
-            # Calculate rewards based on the goals (if reward model is used)
+
+            # Implement goal-based reward model
             if self.use_reward:
                 _states = states.view(-1, state_size)
                 _goals = goals.unsqueeze(0).repeat(self.ensemble_size, 1, 1, 1)
@@ -113,23 +78,12 @@ class HighLevelPlanner(nn.Module):
                 returns += rewards
                 self.trial_rewards.append(rewards)
 
-            # Refine the goal distribution based on the returns
             goal_mean, goal_std_dev = self._fit_gaussian(goals, returns)
 
-        # Return the best goal as the high-level context
+        # Return the high-level goal (context)
         return goal_mean[0].squeeze(dim=0)
 
     def perform_rollout(self, current_state, goals):
-        """
-        Perform a rollout simulation for the given goals.
-
-        Args:
-            current_state (torch.Tensor): The current state tensor.
-            goals (torch.Tensor): The goals to evaluate.
-
-        Returns:
-            Tuple of torch.Tensor: The states, delta means, and delta variances.
-        """
         T = self.plan_horizon + 1
 
         # Initialize lists to store states, delta means, and delta variances
@@ -161,16 +115,6 @@ class HighLevelPlanner(nn.Module):
         return states, delta_vars, delta_means
 
     def _fit_gaussian(self, goals, returns):
-        """
-        Refine the Gaussian distribution for goals based on their returns.
-
-        Args:
-            goals (torch.Tensor): The goal candidates.
-            returns (torch.Tensor): The returns associated with the goal candidates.
-
-        Returns:
-            Tuple of torch.Tensor: The mean and standard deviation for the refined goal distribution.
-        """
         # Replace NaN values in returns with zeros
         returns = torch.where(torch.isnan(returns), torch.zeros_like(returns), returns)
 
@@ -188,3 +132,35 @@ class HighLevelPlanner(nn.Module):
 
         # Return the refined mean and standard deviation for the goal distribution
         return goal_mean, goal_std_dev
+
+    def update(self, state, current_goal, reward, next_state):
+        """
+        Update the high-level planner's goals based on agent performance.
+
+        Args:
+            state (np.ndarray): The current state of the agent.
+            current_goal (torch.Tensor): The current high-level goal.
+            reward (float): The reward received.
+            next_state (np.ndarray): The state after taking the action.
+        """
+        state = torch.from_numpy(state).float().to(self.device)
+        next_state = torch.from_numpy(next_state).float().to(self.device)
+        current_goal = current_goal.to(self.device)
+
+        # Compute the distance between the next state and the current goal
+        goal_error = torch.norm(next_state - current_goal, p=2)
+
+        # Update the goal based on the performance
+        if goal_error > reward:
+            # If the goal was not achieved, adjust the goal to be closer to the next state
+            adjustment = 0.1 * (next_state - current_goal)
+            new_goal = current_goal + adjustment
+        else:
+            # If the goal was achieved, maintain the goal or set a new one
+            new_goal = current_goal
+
+        # Log the updated goal
+        if self.logger is not None:
+            self.logger.log(f"Updated high-level goal: {new_goal.cpu().numpy()}")
+
+        return new_goal
