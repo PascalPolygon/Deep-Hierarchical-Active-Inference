@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 
+# TODO: Add goals
 class Buffer(object):
     def __init__(
         self,
