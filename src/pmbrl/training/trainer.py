@@ -1,3 +1,5 @@
+import torch
+
 class HierarchicalTrainer(object):
     def __init__(
         self,
