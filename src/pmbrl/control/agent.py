@@ -26,6 +26,7 @@ class HierarchicalAgent(object):
         self.context_length = context_length
         self.logger = logger
         self.current_goal = None
+        self.next_goal = None
 
     def get_seed_episodes(self, buffer, n_episodes):
         """
@@ -53,6 +54,10 @@ class HierarchicalAgent(object):
 
                 # After every context_length steps, retroactively compute the goals and store in buffer
                 if (step + 1) % self.context_length == 0 or done:
+                    if step > 0:
+                        # high_level_buffer should have access to buffer in real time
+                        # high_level_buffer.update()
+                        
                     if len(transitions) == self.context_length:
                         # Sample the final goal based on the last state in the contextd
                         # We will take the next_state (at the end of the context) as the final goal
@@ -62,8 +67,8 @@ class HierarchicalAgent(object):
                         # Compute the previous goals in reverse
                         goals = [final_goal]
                         for i in range(self.context_length - 1, 0, -1):
-                            #g(t+1) = s(t) + g(t) - s(t+1) forward transition
-                            # g(t) = g(t+1) + s(t+1) - s(t) bnackward transition
+                            # g(t+1) = s(t) + g(t) - s(t+1) forward transition
+                            # g(t) = g(t+1) + s(t+1) - s(t) backward transition
                             prev_goal = goals[-1] + transitions[i][0] - transitions[i-1][0]
                             goals.append(prev_goal)
                         goals.reverse()  # Reverse to match the order of transitions
@@ -104,7 +109,12 @@ class HierarchicalAgent(object):
             while not done:
                 # Generate a new high-level goal if needed
                 if step % self.context_length == 0:
+                    # Sample a new context-goal from the high-level planner given the current state
                     self.current_goal = self.high_level_planner(state)
+                    if step > 0:
+                        #  We are starting a new context, so we need to store the previous context
+                        # TODO: Implement store context in high_level_buffer. The high_level_buffer should have access to buffer in real time.
+                        # high_level_buffer.update()
 
                 # Generate actions using the low-level planner
                 action, low_level_reward = self.low_level_planner(state, self.current_goal)
@@ -114,44 +124,22 @@ class HierarchicalAgent(object):
 
                 # Take action in the environment
                 next_state, reward, done, _ = self.env.step(action)
+                #  g(t+1) = s(t) + g(t) - s(t+1) forward transition
+                self.next_goal = state + self.current_goal - next_state
                 total_reward += reward
                 total_steps += 1
-
-                # Store the transition temporarily
-                transitions.append((deepcopy(state), action, reward + low_level_reward, deepcopy(next_state)))
-
-                # After every context_length steps, retroactively compute the goals and store in buffer
-                
-                #TODO: Fix this, we're not retroactively computing the goals here 
-                # We're usin the forward transition to compute the goals
-                if (step + 1) % self.context_length == 0 or done:
-                    if len(transitions) == self.context_length:
-                        # Sample the final goal based on the last state in the context
-                        final_goal = self.current_goal
-                        
-                        # Compute the previous goals in reverse
-                        goals = [final_goal]
-                        for i in range(self.context_length - 1, 0, -1):
-                            prev_goal = goals[-1] + transitions[i][0] - transitions[i-1][0]
-                            goals.append(prev_goal)
-                        goals.reverse()  # Reverse to match the order of transitions
-
-                        # Add the transitions and goals to the buffer
-                        for i in range(self.context_length):
-                            state, action, reward, next_state = transitions[i]
-                            next_goal = goals[i]
-                            if buffer is not None:
-                                buffer.add(state, goals[i], action, reward, next_state, next_goal)
-                    transitions = []  # Clear transitions for the next context
 
                 # Log progress every 25 steps
                 if self.logger is not None and total_steps % 25 == 0:
                     self.logger.log("> Step {} [reward {:.2f}]".format(total_steps, total_reward))
 
+                if buffer is not None:
+                    buffer.add(deepcopy(state), deepcopy(self.current_goal), action, reward + low_level_reward, deepcopy(next_state), deepcopy(self.next_goal))
                 if recorder is not None:
                     recorder.capture_frame()
 
                 state = deepcopy(next_state)
+                self.current_goal = deepcopy(self.next_goal)
                 step += 1
 
                 if done:
