@@ -53,11 +53,11 @@ class HierarchicalAgent(object):
                 transitions.append((deepcopy(state), action, reward, deepcopy(next_state)))
 
                 # After every context_length steps, retroactively compute the goals and store in buffer
-                if (step + 1) % self.context_length == 0 or done:
+                if step % self.context_length == 0 or done:
                     if step > 0:
                         # high_level_buffer should have access to buffer in real time
                         # high_level_buffer.update()
-                        
+
                     if len(transitions) == self.context_length:
                         # Sample the final goal based on the last state in the contextd
                         # We will take the next_state (at the end of the context) as the final goal
@@ -101,7 +101,6 @@ class HierarchicalAgent(object):
         total_steps = 0
         done = False
         step = 0
-        transitions = []
 
         with torch.no_grad():
             state = self.env.reset()
@@ -112,9 +111,8 @@ class HierarchicalAgent(object):
                     # Sample a new context-goal from the high-level planner given the current state
                     self.current_goal = self.high_level_planner(state)
                     if step > 0:
-                        #  We are starting a new context, so we need to store the previous context
-                        # TODO: Implement store context in high_level_buffer. The high_level_buffer should have access to buffer in real time.
-                        # high_level_buffer.update()
+                        # Store the high-level context in the high-level buffer
+                        buffer.high_level.update()
 
                 # Generate actions using the low-level planner
                 action, low_level_reward = self.low_level_planner(state, self.current_goal)
@@ -124,7 +122,6 @@ class HierarchicalAgent(object):
 
                 # Take action in the environment
                 next_state, reward, done, _ = self.env.step(action)
-                #  g(t+1) = s(t) + g(t) - s(t+1) forward transition
                 self.next_goal = state + self.current_goal - next_state
                 total_reward += reward
                 total_steps += 1
@@ -134,7 +131,7 @@ class HierarchicalAgent(object):
                     self.logger.log("> Step {} [reward {:.2f}]".format(total_steps, total_reward))
 
                 if buffer is not None:
-                    buffer.add(deepcopy(state), deepcopy(self.current_goal), action, reward + low_level_reward, deepcopy(next_state), deepcopy(self.next_goal))
+                    buffer.low_level.add(deepcopy(state), deepcopy(self.current_goal), action, reward + low_level_reward, deepcopy(next_state), deepcopy(self.next_goal))
                 if recorder is not None:
                     recorder.capture_frame()
 
@@ -147,7 +144,7 @@ class HierarchicalAgent(object):
 
             # Update the high-level planner after the context ends
             if step % self.context_length == 0:
-                self.high_level_planner.update(state, self.current_goal, reward, next_state)
+                self.high_level_planner.update()
 
         # Close the recorder if it was used
         if recorder is not None:
