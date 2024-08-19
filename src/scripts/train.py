@@ -56,6 +56,8 @@ def main(args):
         device=DEVICE,
     )
     reward_model = RewardModel(state_size + action_size, args.hidden_size, device=DEVICE)
+    #TODO: High level and low Level planners should not both be using the same ensemble model
+    # Also, ensure that the reward model and transition desntivies are not the same
     high_level_planner = HighLevelPlanner(
         ensemble=ensemble,
         goal_size=state_size,

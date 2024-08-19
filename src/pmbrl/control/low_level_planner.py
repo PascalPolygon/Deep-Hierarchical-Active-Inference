@@ -29,6 +29,9 @@ class LowLevelPlanner(Planner):
             Tuple of torch.Tensor: The generated actions and the reward.
         """
         # Generate actions using the base Planner's forward method
+        
+        # This action should be conditioned on the goal
+        # It should also 
         actions = super().forward(state)
 
         # Calculate reward based on how close actions are to achieving the goal
