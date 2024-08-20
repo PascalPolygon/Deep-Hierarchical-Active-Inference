@@ -2,7 +2,7 @@ import torch
 
 class HierarchicalTrainer(object):
     """
-    Trainer class for hierarchical reinforcement learning agents.
+    Trainer class for hierarchical active inference agents.
     This class separately trains the high-level and low-level models using a shared buffer.
     """
 
