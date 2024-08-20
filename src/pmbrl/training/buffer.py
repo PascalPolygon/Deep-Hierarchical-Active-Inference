@@ -47,6 +47,7 @@ class Buffer(object):
         self.low_level_actions = np.zeros((buffer_size, action_size))
         self.low_level_rewards = np.zeros((buffer_size, 1))
         self.low_level_goals = np.zeros((buffer_size, goal_size))
+        self.low_level_next_goals = np.zeros((buffer_size, goal_size))
         self.low_level_state_deltas = np.zeros((buffer_size, state_size))
 
         # High-level buffer
@@ -78,6 +79,7 @@ class Buffer(object):
         self.low_level_rewards[idx] = reward
         self.low_level_state_deltas[idx] = state_delta
         self.low_level_goals[idx] = goal
+        self.low_level_next_goals[idx] = next_goal
         self._total_steps += 1
 
         # Update the normalizer with the new experience
@@ -138,12 +140,14 @@ class Buffer(object):
             actions = self.low_level_actions[batch_indices]
             rewards = self.low_level_rewards[batch_indices]
             state_deltas = self.low_level_state_deltas[batch_indices]
+            goals = self.low_level_goals[batch_indices]
 
             # Convert to torch tensors
             states = torch.from_numpy(states).float().to(self.device)
             actions = torch.from_numpy(actions).float().to(self.device)
             rewards = torch.from_numpy(rewards).float().to(self.device)
             state_deltas = torch.from_numpy(state_deltas).float().to(self.device)
+            goals = torch.from_numpy(goals).float().to(self.device)
 
             if self.signal_noise is not None:
                 states = states + self.signal_noise * torch.randn_like(states)
@@ -155,8 +159,9 @@ class Buffer(object):
             state_deltas = state_deltas.reshape(
                 self.ensemble_size, batch_size, self.state_size
             )
+            goals = goals.reshape(self.ensemble_size, batch_size, self.goal_size)
 
-            yield states, actions, rewards, state_deltas
+            yield states, actions, rewards, state_deltas, goals
 
     def __len__(self):
         """

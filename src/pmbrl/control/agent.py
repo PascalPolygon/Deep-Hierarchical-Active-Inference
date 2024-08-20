@@ -55,8 +55,8 @@ class HierarchicalAgent(object):
                 # After every context_length steps, retroactively compute the goals and store in buffer
                 if step % self.context_length == 0 or done:
                     if step > 0:
-                        # high_level_buffer should have access to buffer in real time
-                        # high_level_buffer.update()
+                        # Store the high-level context in the high-level buffer
+                        buffer.high_level.update()
 
                     if len(transitions) == self.context_length:
                         # Sample the final goal based on the last state in the contextd
@@ -112,6 +112,8 @@ class HierarchicalAgent(object):
                     self.current_goal = self.high_level_planner(state)
                     if step > 0:
                         # Store the high-level context in the high-level buffer
+                        #TODO: Implement off-policy goal correction to ensure the goal we use has a high chance of being achieved given the 
+                        # the trajectory t:t+c we alreay have observed
                         buffer.high_level.update()
 
                 # Generate actions using the low-level planner
@@ -143,8 +145,8 @@ class HierarchicalAgent(object):
                     break
 
             # Update the high-level planner after the context ends
-            if step % self.context_length == 0:
-                self.high_level_planner.update()
+            # if step % self.context_length == 0:
+            #     self.high_level_planner.update()
 
         # Close the recorder if it was used
         if recorder is not None:

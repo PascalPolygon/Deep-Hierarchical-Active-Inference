@@ -45,7 +45,7 @@ def main(args):
     state_size = env.observation_space.shape[0]
 
     normalizer = Normalizer()
-    buffer = Buffer(state_size, action_size, args.ensemble_size, normalizer, device=DEVICE)
+    buffer = Buffer(state_size, action_size, args.ensemble_size, normalizer, args.context_length,  device=DEVICE)
 
     ensemble = EnsembleModel(
         state_size + action_size,
@@ -56,8 +56,7 @@ def main(args):
         device=DEVICE,
     )
     reward_model = RewardModel(state_size + action_size, args.hidden_size, device=DEVICE)
-    #TODO: High level and low Level planners should not both be using the same ensemble model
-    # Also, ensure that the reward model and transition desntivies are not the same
+
     high_level_planner = HighLevelPlanner(
         ensemble=ensemble,
         goal_size=state_size,
@@ -125,8 +124,8 @@ def main(args):
         msg = "Training on [{}/{}] data points"
         logger.log(msg.format(buffer.total_steps, buffer.total_steps * args.action_repeat))
         trainer.reset_models()
-        ensemble_loss, reward_loss = trainer.train()
-        logger.log_losses(ensemble_loss, reward_loss)
+        h_ensemble_loss, h_reward_loss, l_ensemble_loss = trainer.train()
+        logger.log_losses(h_ensemble_loss, h_reward_loss, l_ensemble_loss)
 
         recorder = None
         if args.record_every is not None and args.record_every % episode == 0:
@@ -155,6 +154,7 @@ if __name__ == "__main__":
     parser.add_argument("--config_name", type=str, default="mountain_car")
     parser.add_argument("--strategy", type=str, default="information")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--context_length", type=int, default=7)
     args = parser.parse_args()
     config = get_config(args)
     main(config)
