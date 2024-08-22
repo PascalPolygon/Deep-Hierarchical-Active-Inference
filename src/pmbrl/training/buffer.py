@@ -46,6 +46,7 @@ class Buffer(object):
         self._total_steps = 0
 
     def add(self, state, goal, action, reward, next_state, next_goal):
+        #TODO: Verify expected dimensions for state, goal, action, reward, next_state, next_goal
         """
         Add a new low-level experience to the buffer.
 
@@ -58,14 +59,23 @@ class Buffer(object):
             next_goal (np.ndarray): The next goal after the action.
         """
         idx = self._total_steps % self.buffer_size
-        state_delta = next_state - state
+        
+        if isinstance(state, np.ndarray):
+            state = torch.from_numpy(state).float().to(self.device)
+        if isinstance(next_state, np.ndarray):
+            next_state = torch.from_numpy(next_state).float().to(self.device)
+
+        print(f"state: {state}")
+        print(f"next_state: {next_state}")
+
+        state_delta = next_state[0] - state
 
         self.low_level_states[idx] = state
         self.low_level_actions[idx] = action
         self.low_level_rewards[idx] = reward
         self.low_level_state_deltas[idx] = state_delta
         self.low_level_goals[idx] = goal
-        self.low_level_next_goals[idx] = next_goal
+        self.low_level_next_goals[idx] = next_goal[0]
         self._total_steps += 1
 
         # Update the normalizer with the new experience
@@ -153,6 +163,76 @@ class Buffer(object):
             goals = goals.reshape(self.ensemble_size, batch_size, self.goal_size)
 
             yield states, actions, rewards, state_deltas, goals
+    
+    def get_low_level_train_batches(self, batch_size):
+        """
+        Get batches of low-level experiences for training.
+
+        Args:
+            batch_size (int): The size of the batches to return.
+
+        Yields:
+            Tuple of torch.Tensor: Batches of states, goals, and actions.
+        """
+        size = min(self._total_steps, self.buffer_size)
+        indices = np.random.permutation(size)
+
+        for i in range(0, size, batch_size):
+            j = min(size, i + batch_size)
+            if (j - i) < batch_size and i != 0:
+                return
+
+            batch_indices = indices[i:j]
+
+            # Extract batches from the low-level buffer
+            states = torch.from_numpy(self.low_level_states[batch_indices]).float().to(self.device)
+            goals = torch.from_numpy(self.low_level_goals[batch_indices]).float().to(self.device)
+            actions = torch.from_numpy(self.low_level_actions[batch_indices]).float().to(self.device)
+
+            if self.signal_noise is not None:
+                states += self.signal_noise * torch.randn_like(states)
+
+            # Reshape for ensemble processing
+            states = states.view(self.ensemble_size, -1, self.state_size)
+            goals = goals.view(self.ensemble_size, -1, self.goal_size)
+            actions = actions.view(self.ensemble_size, -1, self.action_size)
+
+            yield states, goals, actions
+
+    def get_high_level_train_batches(self, batch_size):
+        """
+        Get batches of high-level experiences for training.
+
+        Args:
+            batch_size (int): The size of the batches to return.
+
+        Yields:
+            Tuple of torch.Tensor: Batches of states, goals, rewards, and state deltas.
+        """
+        size = len(self.high_level_states)
+        indices = np.random.permutation(size)
+
+        for i in range(0, size, batch_size):
+            j = min(size, i + batch_size)
+            if (j - i) < batch_size and i != 0:
+                return
+
+            batch_indices = indices[i:j]
+
+            # Extract batches from the high-level buffer
+            states = torch.from_numpy(np.array(self.high_level_states)[batch_indices]).float().to(self.device)
+            goals = torch.from_numpy(np.array(self.high_level_goals)[batch_indices]).float().to(self.device)
+            rewards = torch.from_numpy(np.array(self.high_level_rewards)[batch_indices]).float().to(self.device)
+            next_states = torch.from_numpy(np.array(self.high_level_next_states)[batch_indices]).float().to(self.device)
+            goal_deltas = next_states - states
+
+            # Reshape for ensemble processing
+            states = states.view(self.ensemble_size, -1, self.state_size)
+            goals = goals.view(self.ensemble_size, -1, self.goal_size)
+            rewards = rewards.view(self.ensemble_size, -1, 1)
+            goal_deltas = goal_deltas.view(self.ensemble_size, -1, self.state_size)
+
+            yield states, goals, rewards, goal_deltas
 
     def __len__(self):
         return min(self._total_steps, self.buffer_size)

@@ -3,15 +3,16 @@ import torch.nn as nn
 
 from pmbrl.control.planner import Planner
 
-class LowLevelPlanner(Planner):
+class LowLevelPlanner(nn.Module):
     #TODO: Verify measures for low-level planner
     """
     Low-level planner responsible for generating actions that bring the agent
     closer to achieving the high-level goal provided by the HighLevelPlanner.
     """
 
-    def __init__(self, ensemble, action_model, ensemble_size, plan_horizon, action_noise_scale, device="cpu"):
-        super(LowLevelPlanner, self).__init__()
+    def __init__(self, env, ensemble, action_model, ensemble_size, plan_horizon, action_noise_scale, device="cpu"):
+        super().__init__()
+        self.env = env
         self.ensemble = ensemble
         self.action_model = action_model
         self.ensemble_size = ensemble_size
@@ -31,21 +32,30 @@ class LowLevelPlanner(Planner):
             action (torch.Tensor): The generated action.
             reward (torch.Tensor): The negative distance between the predicted next state and the goal.
         """
+
+        if not isinstance(state, torch.Tensor):
+            state = torch.tensor(state, dtype=torch.float32, device=self.device)
+        if not isinstance(goal, torch.Tensor):
+            goal = torch.tensor(goal, dtype=torch.float32, device=self.device)
+        # Reshape the state and goal tensors for the ensemble model
+        state = state.unsqueeze(dim=0).unsqueeze(dim=0).repeat(self.ensemble_size, 1, 1)
+        goal = goal.unsqueeze(0).repeat(self.ensemble_size, 1, 1)
+
         # Predict an action given the current state and goal
         action = self.action_model(state, goal)
 
-        # Add Gaussian noise to the action for exploration
-        # noise = torch.randn_like(action) * self.action_noise_scale
-        # action = action + noise
+        # Convert the numpy arrays to tensors
+        min_action = torch.tensor(self.env.action_space.low, dtype=torch.float32, device=action.device)
+        max_action = torch.tensor(self.env.action_space.high, dtype=torch.float32, device=action.device)
 
-        # Clamp the action to be within the valid action range
-        action = torch.clamp(action, min=self.env.action_space.low, max=self.env.action_space.high)
+        # Clamp the action tensor
+        action = torch.clamp(action, min=min_action, max=max_action)
 
         # Predict the next state using the ensemble model
         predicted_next_state, _ = self.ensemble(state, action)
 
         # Calculate the reward as the negative distance to the goal
-        reward = -torch.norm(predicted_next_state - goal, p=2)
+        reward = -torch.norm(predicted_next_state - goal, p=2, dim=-1).mean()
 
         return action, reward
 

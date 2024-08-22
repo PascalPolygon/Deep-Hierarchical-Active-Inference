@@ -1,0 +1,33 @@
+02:04:06
+
+=== Loading experiment [device: cpu] ===
+
+{'action_noise': None,
+ 'action_noise_scale': 0.1,
+ 'action_repeat': 3,
+ 'batch_size': 50,
+ 'coverage': False,
+ 'ensemble_size': 25,
+ 'env_name': 'SparseMountainCar',
+ 'epsilon': 1e-08,
+ 'expl_scale': 1.0,
+ 'expl_strategy': 'information',
+ 'grad_clip_norm': 1000,
+ 'hidden_size': 200,
+ 'learning_rate': 0.001,
+ 'logdir': 'log',
+ 'max_episode_len': 500,
+ 'n_candidates': 500,
+ 'n_episodes': 50,
+ 'n_seed_episodes': 1,
+ 'n_train_epochs': 100,
+ 'optimisation_iters': 5,
+ 'plan_horizon': 30,
+ 'record_every': None,
+ 'reward_scale': 1.0,
+ 'seed': 0,
+ 'strategy': 'information',
+ 'top_candidates': 50,
+ 'use_exploration': True,
+ 'use_mean': False,
+ 'use_reward': True}

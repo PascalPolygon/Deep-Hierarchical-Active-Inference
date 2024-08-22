@@ -3,13 +3,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+# TODO: Ensure we're only using torch tensors and not numpy arrays
 class HierarchicalAgent(object):
     """
     Hierarchical agent that manages the interaction between the high-level and low-level planners.
     The agent controls the flow of information and decisions during an episode.
     """
 
-    def __init__(self, env, high_level_planner, low_level_planner, context_length=1, logger=None, exploration_measure=None):
+    def __init__(self, env, high_level_planner, low_level_planner, context_length=1, logger=None, exploration_measure=None, device="cpu"):
         """
         Initialize the HierarchicalAgent.
 
@@ -28,6 +29,7 @@ class HierarchicalAgent(object):
         self.logger = logger
         self.current_goal = None
         self.next_goal = None
+        self.device = device
 
     def get_seed_episodes(self, buffer, n_episodes):
         """
@@ -108,6 +110,7 @@ class HierarchicalAgent(object):
             while not done:
                 if step % self.context_length == 0:
                     self.current_goal = self.high_level_planner(state)
+                    self.logger.log("New context")
                     if self.logger:
                         self.logger.log(f"New high-level goal sampled at step {step}: {self.current_goal}")
 
@@ -123,6 +126,12 @@ class HierarchicalAgent(object):
                 action = action.cpu().detach().numpy()
 
                 next_state, reward, done, _ = self.env.step(action)
+
+                # if not isinstance(self.current_goal, torch.Tensor):
+                #     self.current_goal = torch.from_numpy(self.current_goal).float().to(self.device)
+                if not isinstance(state, torch.Tensor):
+                    state = torch.from_numpy(state).float().to(self.device)
+
                 self.next_goal = state + self.current_goal - next_state
                 total_reward += reward
                 total_steps += 1
@@ -134,9 +143,10 @@ class HierarchicalAgent(object):
                     self.logger.log(f"Progress log - Total steps: {total_steps}, Total reward: {total_reward}")
 
                 if buffer is not None:
-                    buffer.add(deepcopy(state), deepcopy(self.current_goal), action, reward + low_level_reward, deepcopy(next_state), deepcopy(self.next_goal))
-                    if self.logger:
-                        self.logger.log(f"Low-level transition added: state={state}, goal={self.current_goal}, action={action}, reward={reward + low_level_reward}, next_state={next_state}, next_goal={self.next_goal}")
+                    # self.logger.log(f"Action: {action}")
+                    buffer.add(deepcopy(state), deepcopy(self.current_goal), action[0], reward + low_level_reward, deepcopy(next_state), deepcopy(self.next_goal))
+                    # if self.logger:
+                    #     self.logger.log(f"Low-level transition added: state={state}, goal={self.current_goal}, action={action}, reward={reward + low_level_reward}, next_state={next_state}, next_goal={self.next_goal}")
 
                 if recorder is not None:
                     recorder.capture_frame()

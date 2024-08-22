@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal
+import numpy as np
 
 def swish(x):
     """
@@ -25,6 +26,10 @@ class EnsembleDenseLayer(nn.Module):
             act_fn (str): Activation function name ("swish" or "linear").
         """
         super().__init__()
+        # print("in_size: ", in_size)
+        # print("out_size: ", out_size)
+        # print("ensemble_size: ", ensemble_size)
+
         self.in_size = in_size
         self.out_size = out_size
         self.ensemble_size = ensemble_size
@@ -42,6 +47,11 @@ class EnsembleDenseLayer(nn.Module):
         Returns:
             torch.Tensor: Output tensor after applying the linear transformation and activation function.
         """
+        # Ensure that all tensors are of the same dtype
+        x = x.to(self.weights.dtype)
+        self.biases = self.biases.to(self.weights.dtype)
+
+        # Perform the operation
         op = torch.baddbmm(self.biases, x, self.weights)
         op = self.act_fn(op)
         return op
@@ -87,28 +97,28 @@ class EnsembleDenseLayer(nn.Module):
         elif act_fn_name == "linear":
             return lambda x: x
 
-class HighLevelEnsembleModel(nn.Module):
+class EnsembleModel(nn.Module):
     """
     High-level ensemble model that predicts state changes given the current state and goal.
     """
 
-    def __init__(self, state_size, goal_size, hidden_size, ensemble_size, normalizer, device="cpu"):
+    def __init__(self, in_size, out_size, hidden_size, ensemble_size, normalizer, device="cpu"):
         """
         Initialize the HighLevelEnsembleModel.
 
         Args:
-            state_size (int): Dimension of the state space.
-            goal_size (int): Dimension of the goal space.
+            in_size (int): Dimension of the state space + goal space.
+            out_size (int): Dimension of the goal space.
             hidden_size (int): Dimension of the hidden layers.
             ensemble_size (int): Number of ensemble members.
             normalizer (Normalizer): Normalizer for the input data.
             device (str): Device to run the model on ("cpu" or "cuda").
         """
         super().__init__()
-        self.fc_1 = EnsembleDenseLayer(state_size + goal_size, hidden_size, ensemble_size, act_fn="swish")
+        self.fc_1 = EnsembleDenseLayer(in_size, hidden_size, ensemble_size, act_fn="swish")
         self.fc_2 = EnsembleDenseLayer(hidden_size, hidden_size, ensemble_size, act_fn="swish")
         self.fc_3 = EnsembleDenseLayer(hidden_size, hidden_size, ensemble_size, act_fn="swish")
-        self.fc_4 = EnsembleDenseLayer(hidden_size, state_size * 2, ensemble_size, act_fn="linear")
+        self.fc_4 = EnsembleDenseLayer(hidden_size, out_size * 2, ensemble_size, act_fn="linear")
 
         self.ensemble_size = ensemble_size
         self.normalizer = normalizer
@@ -173,7 +183,10 @@ class HighLevelEnsembleModel(nn.Module):
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: Mean and variance of the state deltas.
         """
+        # print("states.shape: ", states.shape)
+        # print("actions.shape: ", goals.shape)
         inp = torch.cat((states, goals), dim=2)  # Concatenate states and goals
+        # print("inp.shape: ", inp.shape)
         op = self.fc_1(inp)  # First hidden layer
         op = self.fc_2(op)   # Second hidden layer
         op = self.fc_3(op)   # Third hidden layer
@@ -197,6 +210,11 @@ class HighLevelEnsembleModel(nn.Module):
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: Normalized states and goals.
         """
+        if isinstance(states, np.ndarray):
+            states = torch.from_numpy(states).float().to(self.device)
+        if isinstance(goals, np.ndarray):
+            goals = torch.from_numpy(goals).float().to(self.device)
+
         states = states.to(self.device)
         goals = goals.to(self.device)
         states = self.normalizer.normalize_states(states)
@@ -387,15 +405,18 @@ class RewardModel(nn.Module):
         self.reset_parameters()
         self.to(device)
 
-    def forward(self, states, actions):
-        inp = torch.cat((states, actions), dim=-1)
+    def forward(self, states, goals):
+        # print("in_size: ", self.in_size)
+        # print("states.shape: ", states.shape)
+        # print("actions.shape: ", goals.shape)
+        inp = torch.cat((states, goals), dim=-1)
         reward = self.act_fn(self.fc_1(inp))
         reward = self.act_fn(self.fc_2(reward))
         reward = self.fc_3(reward).squeeze(dim=1)
         return reward
 
-    def loss(self, states, actions, rewards):
-        r_hat = self(states, actions)
+    def loss(self, states, goals, rewards):
+        r_hat = self(states, goals)
         return F.mse_loss(r_hat, rewards)
 
     def reset_parameters(self):
@@ -414,8 +435,26 @@ class ActionModel(nn.Module):
         self.to(device)
 
     def forward(self, state, goal):
+          # Convert state and goal to tensors if they are numpy arrays
+        if isinstance(state, np.ndarray):
+            state = torch.from_numpy(state).float().to(self.device)
+        if isinstance(goal, np.ndarray):
+            goal = torch.from_numpy(goal).float().to(self.device)
+
+        # Debugging: Print the shapes of state and goal
+        # print(f"State shape: {state.shape}, Goal shape: {goal.shape}")
         x = torch.cat([state, goal], dim=-1)
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
         action = torch.tanh(self.fc3(x))  # Use tanh to bound the action space
         return action
+
+    def loss(self, states, goals, actions):
+        predicted_actions = self.forward(states, goals)
+        return F.mse_loss(predicted_actions, actions)
+
+    def reset_parameters(self):
+        self.fc1.reset_parameters()
+        self.fc2.reset_parameters()
+        self.fc3.reset_parameters()
+

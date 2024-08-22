@@ -25,11 +25,12 @@ class Logger(object):
         f.close()
         print(string)
 
-    def log_losses(self, e_loss, r_loss):
+    def log_losses(self, e_loss, r_loss, l_action_loss):
         self.metrics["e_losses"].append(e_loss)
         self.metrics["r_losses"].append(r_loss)
-        msg = "Ensemble loss {:.2f} / Reward Loss {:.2f}"
-        self.log(msg.format(e_loss, r_loss))
+        self.metrics["l_action_losses"].append(l_action_loss)
+        msg = "Ensemble loss {:.2f} / Reward Loss {:.2f} / Action Loss {:.2f}"
+        self.log(msg.format(e_loss, r_loss, l_action_loss))
 
     def log_coverage(self, coverage):
         self.metrics["coverage"].append(coverage)
@@ -75,6 +76,7 @@ class Logger(object):
         self.metrics = {
             "e_losses": [],
             "r_losses": [],
+            "l_action_losses": [],
             "rewards": [],
             "steps": [],
             "times": [],

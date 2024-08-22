@@ -71,6 +71,7 @@ class Config(object):
         self.expl_scale = 1.0
         self.reward_scale = 1.0
         self.action_noise_scale = 0.1
+        self.context_length = 7
 
     def set_logdir(self, logdir):
         self.logdir = logdir

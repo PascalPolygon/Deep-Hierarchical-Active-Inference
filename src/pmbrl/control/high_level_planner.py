@@ -7,7 +7,9 @@ class HighLevelPlanner(nn.Module):
     #TODO: Verify measures for high-level planner
     def __init__(
         self,
+        env,
         ensemble,
+        reward_model,
         goal_size,
         ensemble_size,
         plan_horizon,
@@ -15,19 +17,25 @@ class HighLevelPlanner(nn.Module):
         n_candidates,
         top_candidates,
         use_exploration=True,
+        use_reward=True,
+        reward_scale=1.0,
         expl_scale=1.0,
         strategy="information",
         device="cpu",
     ):
         super().__init__()
+        self.env = env
         self.ensemble = ensemble
+        self.reward_model = reward_model
         self.goal_size = goal_size
         self.ensemble_size = ensemble_size
         self.plan_horizon = plan_horizon
         self.optimisation_iters = optimisation_iters
         self.n_candidates = n_candidates
         self.top_candidates = top_candidates
+        self.use_reward = use_reward
         self.use_exploration = use_exploration
+        self.reward_scale = reward_scale
         self.expl_scale = expl_scale
         self.device = device
 
@@ -57,9 +65,13 @@ class HighLevelPlanner(nn.Module):
         for _ in range(self.optimisation_iters):
             goals = goal_mean + goal_std_dev * torch.randn(
                 self.plan_horizon, self.n_candidates, self.goal_size, device=self.device)
+            
+            # Convert numpy arrays to tensors
+            min_bounds = torch.tensor(self.env.observation_space.low, device=goals.device)
+            max_bounds = torch.tensor(self.env.observation_space.high, device=goals.device)
 
             # Ensure the sampled goals are within the environment's state bounds
-            goals = torch.clamp(goals, min=self.env.observation_space.low, max=self.env.observation_space.high)
+            goals = torch.clamp(goals, min=min_bounds, max=max_bounds)
 
             states, delta_vars, delta_means = self.perform_rollout(state, goals)
 
@@ -75,7 +87,7 @@ class HighLevelPlanner(nn.Module):
                 _states = states.view(-1, state_size)
                 _goals = goals.unsqueeze(0).repeat(self.ensemble_size, 1, 1, 1)
                 _goals = _goals.view(-1, self.goal_size)
-                rewards = self.reward_model(_goals)
+                rewards = self.reward_model(_states, _goals)
                 rewards = rewards * self.reward_scale
                 rewards = rewards.view(self.plan_horizon, self.ensemble_size, self.n_candidates)
                 rewards = rewards.mean(dim=1).sum(dim=0)

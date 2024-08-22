@@ -13,15 +13,15 @@ from gym.wrappers.monitoring.video_recorder import VideoRecorder
 sys.path.append(str(pathlib.Path(__file__).parent.parent))
 
 from pmbrl.envs import GymEnv
-from pmbrl.training import Normalizer, Buffer, Trainer
+from pmbrl.training import Normalizer, Buffer, HierarchicalTrainer
 from pmbrl.models import EnsembleModel, RewardModel, ActionModel
-from pmbrl.control import Planner, Agent
 from pmbrl.control import HighLevelPlanner, LowLevelPlanner, HierarchicalAgent
-from pmbrl.training import HierarchicalTrainer
 from pmbrl.utils import Logger
 from pmbrl import get_config
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+# TODO: Ensure we're only using torch tensors and not numpy arrays throughout the codebase
 
 
 def main(args):
@@ -46,27 +46,40 @@ def main(args):
     goal_size = state_size
 
     normalizer = Normalizer()
-    buffer = Buffer(state_size, action_size, args.ensemble_size, normalizer, args.context_length,  device=DEVICE)
+    print(f'context_length: {args.context_length}')
+    buffer = Buffer(state_size, action_size, goal_size, args.ensemble_size, normalizer, args.context_length,  device=DEVICE)
 
     ensemble = EnsembleModel(
-        state_size + action_size,
+        state_size + goal_size,
         state_size,
         args.hidden_size,
         args.ensemble_size,
         normalizer,
         device=DEVICE,
     )
-    reward_model = RewardModel(state_size + action_size, args.hidden_size, device=DEVICE)
+    reward_model = RewardModel(state_size + goal_size, args.hidden_size, device=DEVICE)
     action_model = ActionModel(state_size, goal_size, action_size, args.hidden_size, device=DEVICE)
 
     high_level_planner = HighLevelPlanner(
+        env=env,
         ensemble=ensemble,
-        goal_size=state_size,
+        reward_model=reward_model,
+        goal_size=goal_size,
+        ensemble_size=args.ensemble_size,
         plan_horizon=args.plan_horizon,
+        optimisation_iters=args.optimisation_iters,
+        n_candidates=args.n_candidates,
+        top_candidates=args.top_candidates,
+        use_reward=args.use_reward,
+        reward_scale=args.reward_scale,
+        use_exploration=args.use_exploration,
+        expl_scale=args.expl_scale,
+        strategy=args.strategy,
         device=DEVICE,
     )
 
     low_level_planner = LowLevelPlanner(
+        env=env,
         ensemble=ensemble,
         action_model=action_model,
         ensemble_size=args.ensemble_size,
@@ -113,8 +126,9 @@ def main(args):
     agent = HierarchicalAgent(env, high_level_planner, low_level_planner, logger=logger)
 
     trainer = HierarchicalTrainer(
-        high_level_model=high_level_planner,
-        low_level_model=low_level_planner,
+        high_level_ensemble_model=ensemble,
+        high_level_reward_model=reward_model,
+        low_level_action_model=action_model,
         buffer=buffer,
         n_train_epochs=args.n_train_epochs,
         batch_size=args.batch_size,
@@ -122,6 +136,7 @@ def main(args):
         epsilon=args.epsilon,
         grad_clip_norm=args.grad_clip_norm,
         logger=logger,
+        device=DEVICE,
     )
 
     agent.get_seed_episodes(buffer, args.n_seed_episodes)
@@ -135,8 +150,8 @@ def main(args):
         msg = "Training on [{}/{}] data points"
         logger.log(msg.format(buffer.total_steps, buffer.total_steps * args.action_repeat))
         trainer.reset_models()
-        h_ensemble_loss, h_reward_loss, l_ensemble_loss = trainer.train()
-        logger.log_losses(h_ensemble_loss, h_reward_loss, l_ensemble_loss)
+        h_ensemble_loss, h_reward_loss, l_action_loss = trainer.train()
+        logger.log_losses(h_ensemble_loss, h_reward_loss, l_action_loss)
 
         recorder = None
         if args.record_every is not None and args.record_every % episode == 0:

@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from copy import deepcopy
 
 class Normalizer(object):
     """
@@ -38,6 +39,11 @@ class Normalizer(object):
         Returns:
             np.ndarray: The updated mean.
         """
+        # print("mu_old: ", mu_old)
+        if not isinstance(mu_old, torch.Tensor):
+            mu_old = torch.tensor(mu_old, dtype=torch.float32)
+        if not isinstance(addendum, torch.Tensor):
+            addendum = torch.tensor(addendum)
         mu_new = mu_old + (addendum - mu_old) / n
         return mu_new
 
@@ -55,6 +61,15 @@ class Normalizer(object):
         Returns:
             np.ndarray: The updated sum of squares.
         """
+        if not isinstance(sk_old, torch.Tensor):
+            sk_old = torch.tensor(sk_old, dtype=torch.float32)
+        if not isinstance(mu_old, torch.Tensor):
+            mu_old = torch.tensor(mu_old, dtype=torch.float32)
+        if not isinstance(mu_new, torch.Tensor):
+            mu_new = torch.tensor(mu_new, dtype=torch.float32)
+        if not isinstance(addendum, torch.Tensor):
+            addendum = torch.tensor(addendum, dtype=torch.float32)
+
         sk_new = sk_old + (addendum - mu_old) * (addendum - mu_new)
         return sk_new
 
@@ -72,13 +87,13 @@ class Normalizer(object):
 
         if self.count == 1:
             # Initialize statistics
-            self.state_mean = state.copy()
+            self.state_mean = deepcopy(state)
             self.state_sk = np.zeros_like(state)
             self.state_stdev = np.zeros_like(state)
             self.action_mean = action.copy()
             self.action_sk = np.zeros_like(action)
             self.action_stdev = np.zeros_like(action)
-            self.state_delta_mean = state_delta.copy()
+            self.state_delta_mean = deepcopy(state_delta)
             self.state_delta_sk = np.zeros_like(state_delta)
             self.state_delta_stdev = np.zeros_like(state_delta)
             self.goal_mean = goal.copy()
@@ -87,10 +102,14 @@ class Normalizer(object):
             return
 
         # Store old means for update calculations
-        state_mean_old = self.state_mean.copy()
-        action_mean_old = self.action_mean.copy()
-        state_delta_mean_old = self.state_delta_mean.copy()
-        goal_mean_old = self.goal_mean.copy()
+        # state_mean_old = self.state_mean.copy()
+        state_mean_old = deepcopy(self.state_mean)
+        # action_mean_old = self.action_mean.copy()
+        action_mean_old = deepcopy(self.action_mean)
+        # state_delta_mean_old = self.state_delta_mean.copy()
+        state_delta_mean_old = deepcopy(self.state_delta_mean)
+        # goal_mean_old = self.goal_mean.copy()
+        goal_mean_old = deepcopy(self.goal_mean)
 
         # Update means
         self.state_mean = self.update_mean(self.state_mean, state, self.count)
@@ -147,9 +166,11 @@ class Normalizer(object):
         Returns:
             Tuple of torch.Tensor: The mean and standard deviation tensors.
         """
-        mean, stdev = mean.copy(), stdev.copy()
-        mean = torch.from_numpy(mean).float().to(x.device)
-        stdev = torch.from_numpy(stdev).float().to(x.device)
+        mean, stdev = deepcopy(mean), deepcopy(stdev)
+        if isinstance(mean, np.ndarray):
+            mean = torch.from_numpy(mean).float().to(x.device)
+        if isinstance(stdev, np.ndarray):
+            stdev = torch.from_numpy(stdev).float().to(x.device)
         return mean, stdev
 
     def _normalize(self, x, mean, stdev):
@@ -206,6 +227,7 @@ class Normalizer(object):
         return self._normalize(
             state_deltas, self.state_delta_mean, self.state_delta_stdev
         )
+    
 
     def denormalize_state_delta_means(self, state_deltas_means):
         """
@@ -266,3 +288,41 @@ class Normalizer(object):
             state_delta_vars, self.state_delta_mean, self.state_delta_stdev
         )
         return state_delta_vars / (torch.clamp(stdev, min=1e-8) ** 2)
+    
+    def normalize_goal_deltas(self, goal_deltas):
+        """
+        Normalize the goal deltas.
+
+        Args:
+            goal_deltas (torch.Tensor): The goal delta tensor to normalize.
+
+        Returns:
+            torch.Tensor: The normalized goal deltas.
+        """
+        return self._normalize(goal_deltas, self.state_delta_mean, self.state_delta_stdev)
+
+    def renormalize_goal_deltas(self, goal_deltas):
+        """
+        Renormalize goal deltas.
+
+        Args:
+            goal_deltas (torch.Tensor): The goal deltas to renormalize.
+
+        Returns:
+            torch.Tensor: The renormalized goal deltas.
+        """
+        mean, stdev = self.setup_vars(goal_deltas, self.state_delta_mean, self.state_delta_stdev)
+        return (goal_deltas * torch.clamp(stdev, min=1e-8)) + mean
+    
+    def denormalize_goal_deltas(self, goal_deltas):
+        """
+        Denormalize goal deltas.
+
+        Args:
+            goal_deltas (torch.Tensor): The normalized goal deltas.
+
+        Returns:
+            torch.Tensor: The denormalized goal deltas.
+        """
+        mean, stdev = self.setup_vars(goal_deltas, self.state_delta_mean, self.state_delta_stdev)
+        return goal_deltas * stdev + mean
