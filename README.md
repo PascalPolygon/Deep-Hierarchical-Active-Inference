@@ -11,5 +11,5 @@ Implementation of Hierarchical Active Inference Agent for perception, planning, 
 ```
 git clone https://github.com/PascalPolygon/Deep-Hierarchical-Active-Inference.git
 cd Deep-Hierarchical-Active-Inference
-python scripts/train.py --config_name="mountain_car" --logdir="mountain_car" --strategy="information" --seed=0
+python src/scripts/train.py --config_name="mountain_car" --logdir="mountain_car" --strategy="information" --seed=0
 ```
