@@ -4,6 +4,7 @@ import torch.nn as nn
 from pmbrl.control.planner import Planner
 
 class LowLevelPlanner(Planner):
+    #TODO: Verify measures for low-level planner
     """
     Low-level planner responsible for generating actions that bring the agent
     closer to achieving the high-level goal provided by the HighLevelPlanner.

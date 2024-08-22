@@ -84,11 +84,14 @@ class Buffer(object):
 
         # Update the normalizer with the new experience
         self.normalizer.update(state, action, state_delta, goal)
-
-    def update(self):
+    
+    def update(self, corrected_goal=None):
         """
         Update the high-level buffer with the latest context information.
         This method assumes that the context has been fully populated in the low-level buffer.
+
+        Args:
+            corrected_goal (torch.Tensor, Optional): The corrected goal after off-policy correction.
         """
         if len(self.low_level_states) < self.context_length:
             return
@@ -98,11 +101,13 @@ class Buffer(object):
 
         # Extract context transitions
         st = self.low_level_states[start_idx]
+        if corrected_goal is not None:
+            self.low_level_goals[start_idx] = corrected_goal.cpu().numpy()  # Use the corrected goal
         gt = self.low_level_goals[start_idx]
         Rt_t_c = np.sum(self.low_level_rewards[start_idx:end_idx + 1])
         st_c = self.low_level_states[end_idx]
 
-        # Append the high-level transition tuple
+        # Append the high-level transition tuple with corrected goal
         self.high_level_states.append(st)
         self.high_level_goals.append(gt)
         self.high_level_rewards.append(Rt_t_c)

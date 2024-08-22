@@ -4,6 +4,7 @@ import torch.nn as nn
 from pmbrl.control.measures import InformationGain, Disagreement, Variance, Random
 
 class HighLevelPlanner(nn.Module):
+    #TODO: Verify measures for high-level planner
     def __init__(
         self,
         ensemble,
