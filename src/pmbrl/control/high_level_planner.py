@@ -58,6 +58,9 @@ class HighLevelPlanner(nn.Module):
             goals = goal_mean + goal_std_dev * torch.randn(
                 self.plan_horizon, self.n_candidates, self.goal_size, device=self.device)
 
+            # Ensure the sampled goals are within the environment's state bounds
+            goals = torch.clamp(goals, min=self.env.observation_space.low, max=self.env.observation_space.high)
+
             states, delta_vars, delta_means = self.perform_rollout(state, goals)
 
             returns = torch.zeros(self.n_candidates).float().to(self.device)
@@ -83,6 +86,7 @@ class HighLevelPlanner(nn.Module):
 
         # Return the high-level goal (context)
         return goal_mean[0].squeeze(dim=0)
+
 
     def perform_rollout(self, current_state, goals):
         T = self.plan_horizon + 1

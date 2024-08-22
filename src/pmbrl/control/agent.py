@@ -114,6 +114,7 @@ class HierarchicalAgent(object):
                     if step > 0:
                         # Perform off-policy goal correction before updating the buffer
                         corrected_goal = self.off_policy_goal_correction(buffer, state, exploration_scale=self.high_level_planner.expl_scale)
+                        # TODO: Could we refit the high-level planner here given the new corrected goal?
                         buffer.high_level.update(corrected_goal)
 
                 # Generate actions using the low-level planner
@@ -196,6 +197,9 @@ class HierarchicalAgent(object):
         for _ in range(8):
             sampled_goal = torch.normal(mean, std_dev).to(self.device)
             candidate_goals.append(sampled_goal)
+
+        # Ensure all candidate goals are within the environment's state bounds
+        candidate_goals = [torch.clamp(goal, min=self.env.observation_space.low, max=self.env.observation_space.high) for goal in candidate_goals]
 
         # Evaluate the candidate goals
         best_goal = None
