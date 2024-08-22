@@ -403,3 +403,19 @@ class RewardModel(nn.Module):
         self.fc_2 = nn.Linear(self.hidden_size, self.hidden_size)
         self.fc_3 = nn.Linear(self.hidden_size, 1)
         self.to(self.device)
+
+class ActionModel(nn.Module):
+    def __init__(self, state_size, goal_size, action_size, hidden_size, device="cpu"):
+        super(ActionModel, self).__init__()
+        self.fc1 = nn.Linear(state_size + goal_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, action_size)
+        self.device = device
+        self.to(device)
+
+    def forward(self, state, goal):
+        x = torch.cat([state, goal], dim=-1)
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        action = torch.tanh(self.fc3(x))  # Use tanh to bound the action space
+        return action

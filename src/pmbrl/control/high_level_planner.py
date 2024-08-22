@@ -138,34 +138,34 @@ class HighLevelPlanner(nn.Module):
         # Return the refined mean and standard deviation for the goal distribution
         return goal_mean, goal_std_dev
 
-    def update(self, state, current_goal, reward, next_state):
-        """
-        Update the high-level planner's goals based on agent performance.
+    # def update(self, state, current_goal, reward, next_state):
+    #     """
+    #     Update the high-level planner's goals based on agent performance.
 
-        Args:
-            state (np.ndarray): The current state of the agent.
-            current_goal (torch.Tensor): The current high-level goal.
-            reward (float): The reward received.
-            next_state (np.ndarray): The state after taking the action.
-        """
-        state = torch.from_numpy(state).float().to(self.device)
-        next_state = torch.from_numpy(next_state).float().to(self.device)
-        current_goal = current_goal.to(self.device)
+    #     Args:
+    #         state (np.ndarray): The current state of the agent.
+    #         current_goal (torch.Tensor): The current high-level goal.
+    #         reward (float): The reward received.
+    #         next_state (np.ndarray): The state after taking the action.
+    #     """
+    #     state = torch.from_numpy(state).float().to(self.device)
+    #     next_state = torch.from_numpy(next_state).float().to(self.device)
+    #     current_goal = current_goal.to(self.device)
 
-        # Compute the distance between the next state and the current goal
-        goal_error = torch.norm(next_state - current_goal, p=2)
+    #     # Compute the distance between the next state and the current goal
+    #     goal_error = torch.norm(next_state - current_goal, p=2)
 
-        # Update the goal based on the performance
-        if goal_error > reward:
-            # If the goal was not achieved, adjust the goal to be closer to the next state
-            adjustment = 0.1 * (next_state - current_goal)
-            new_goal = current_goal + adjustment
-        else:
-            # If the goal was achieved, maintain the goal or set a new one
-            new_goal = current_goal
+    #     # Update the goal based on the performance
+    #     if goal_error > reward:
+    #         # If the goal was not achieved, adjust the goal to be closer to the next state
+    #         adjustment = 0.1 * (next_state - current_goal)
+    #         new_goal = current_goal + adjustment
+    #     else:
+    #         # If the goal was achieved, maintain the goal or set a new one
+    #         new_goal = current_goal
 
-        # Log the updated goal
-        if self.logger is not None:
-            self.logger.log(f"Updated high-level goal: {new_goal.cpu().numpy()}")
+    #     # Log the updated goal
+    #     if self.logger is not None:
+    #         self.logger.log(f"Updated high-level goal: {new_goal.cpu().numpy()}")
 
-        return new_goal
+    #     return new_goal

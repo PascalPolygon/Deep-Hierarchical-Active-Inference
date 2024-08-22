@@ -14,7 +14,7 @@ sys.path.append(str(pathlib.Path(__file__).parent.parent))
 
 from pmbrl.envs import GymEnv
 from pmbrl.training import Normalizer, Buffer, Trainer
-from pmbrl.models import EnsembleModel, RewardModel
+from pmbrl.models import EnsembleModel, RewardModel, ActionModel
 from pmbrl.control import Planner, Agent
 from pmbrl.control import HighLevelPlanner, LowLevelPlanner, HierarchicalAgent
 from pmbrl.training import HierarchicalTrainer
@@ -43,6 +43,7 @@ def main(args):
     )
     action_size = env.action_space.shape[0]
     state_size = env.observation_space.shape[0]
+    goal_size = state_size
 
     normalizer = Normalizer()
     buffer = Buffer(state_size, action_size, args.ensemble_size, normalizer, args.context_length,  device=DEVICE)
@@ -56,31 +57,41 @@ def main(args):
         device=DEVICE,
     )
     reward_model = RewardModel(state_size + action_size, args.hidden_size, device=DEVICE)
+    action_model = ActionModel(state_size, goal_size, action_size, args.hidden_size, device=DEVICE)
 
     high_level_planner = HighLevelPlanner(
         ensemble=ensemble,
         goal_size=state_size,
-        plan_horizon=args.high_level_plan_horizon,
+        plan_horizon=args.plan_horizon,
         device=DEVICE,
     )
 
     low_level_planner = LowLevelPlanner(
         ensemble=ensemble,
-        reward_model=reward_model,
-        action_size=action_size,
+        action_model=action_model,
         ensemble_size=args.ensemble_size,
-        plan_horizon=args.plan_horizon,
-        optimisation_iters=args.optimisation_iters,
-        n_candidates=args.n_candidates,
-        top_candidates=args.top_candidates,
-        use_reward=args.use_reward,
-        use_exploration=args.use_exploration,
-        use_mean=args.use_mean,
-        expl_scale=args.expl_scale,
-        reward_scale=args.reward_scale,
-        strategy=args.strategy,
+        plan_horizon=args.context_length,
+        action_noise_scale=args.action_noise_scale,
         device=DEVICE,
     )
+
+    # low_level_planner = LowLevelPlanner(
+    #     ensemble=ensemble,
+    #     reward_model=reward_model,
+    #     action_size=action_size,
+    #     ensemble_size=args.ensemble_size,
+    #     plan_horizon=args.context_length,
+    #     optimisation_iters=args.optimisation_iters,
+    #     n_candidates=args.n_candidates,
+    #     top_candidates=args.top_candidates,
+    #     use_reward=args.use_reward,
+    #     use_exploration=args.use_exploration,
+    #     use_mean=args.use_mean,
+    #     expl_scale=args.expl_scale,
+    #     reward_scale=args.reward_scale,
+    #     strategy=args.strategy,
+    #     device=DEVICE,
+    # )
 
     # planner = Planner(
     #     ensemble,

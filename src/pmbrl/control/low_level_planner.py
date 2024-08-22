@@ -10,42 +10,51 @@ class LowLevelPlanner(Planner):
     closer to achieving the high-level goal provided by the HighLevelPlanner.
     """
 
-    def __init__(self, *args, **kwargs):
-        """
-        Initialize the LowLevelPlanner.
-
-        Inherits parameters from the Planner base class.
-        """
-        super().__init__(*args, **kwargs)
+    def __init__(self, ensemble, action_model, ensemble_size, plan_horizon, action_noise_scale, device="cpu"):
+        super(LowLevelPlanner, self).__init__()
+        self.ensemble = ensemble
+        self.action_model = action_model
+        self.ensemble_size = ensemble_size
+        self.plan_horizon = plan_horizon
+        self.action_noise_scale = action_noise_scale
+        self.device = device
 
     def forward(self, state, goal):
         """
-        Generate actions and calculate the reward based on the proximity to the goal.
+        Generate actions based on the current state and goal.
 
         Args:
             state (torch.Tensor): The current state of the environment.
-            goal (torch.Tensor): The high-level goal to achieve.
+            goal (torch.Tensor): The desired goal state.
 
         Returns:
-            Tuple of torch.Tensor: The generated actions and the reward.
+            action (torch.Tensor): The generated action.
+            reward (torch.Tensor): The negative distance between the predicted next state and the goal.
         """
-        # Generate actions using the base Planner's forward method
-        
-        # This action should be conditioned on the goal
-        # It should also 
-        actions = super().forward(state)
+        # Predict an action given the current state and goal
+        action = self.action_model(state, goal)
 
-        # Calculate reward based on how close actions are to achieving the goal
-        reward = -torch.norm(state - goal, p=2)  # Reward shaped by distance to goal
-        return actions, reward
+        # Add Gaussian noise to the action for exploration
+        noise = torch.randn_like(action) * self.action_noise_scale
+        action = action + noise
 
-    def perform_rollout(self, current_state, actions, goal):
+        # Clamp the action to be within the valid action range
+        action = torch.clamp(action, min=self.env.action_space.low, max=self.env.action_space.high)
+
+        # Predict the next state using the ensemble model
+        predicted_next_state, _ = self.ensemble(state, action)
+
+        # Calculate the reward as the negative distance to the goal
+        reward = -torch.norm(predicted_next_state - goal, p=2)
+
+        return action, reward
+
+    def perform_rollout(self, current_state, goal):
         """
         Perform a rollout simulation to evaluate the actions against the goal.
 
         Args:
             current_state (torch.Tensor): The current state tensor.
-            actions (torch.Tensor): The actions to evaluate.
             goal (torch.Tensor): The goal to achieve.
 
         Returns:
@@ -60,28 +69,16 @@ class LowLevelPlanner(Planner):
 
         # Prepare the initial state tensor
         current_state = current_state.unsqueeze(dim=0).unsqueeze(dim=0)
-     
-        current_state = current_state.repeat(self.ensemble_size, self.n_candidates, 1)
+        current_state = current_state.repeat(self.ensemble_size, 1, 1)
         states[0] = current_state
-
-        # Prepare the actions tensor for the ensemble
-        actions = actions.unsqueeze(0)
-        actions = actions.repeat(self.ensemble_size, 1, 1, 1).permute(1, 0, 2, 3)
 
         # Simulate each time step in the planning horizon
         for t in range(self.plan_horizon):
-            # TODO: states must be gnerated based on goal
-            # delta_mean, delta_var = self.ensemble(states[t], actions[t], goal)
-            delta_mean, delta_var = self.ensemble(states[t], actions[t])
-            if self.use_mean:
-                states[t + 1] = states[t] + delta_mean
-            else:
-                states[t + 1] = states[t] + self.ensemble.sample(delta_mean, delta_var)
-                # TODO: states must be gnerated based on goal
-                # states[t + 1] = states[t] + self.ensemble.sample(delta_mean, delta_var, goal)
-
-            delta_means[t + 1] = delta_mean
+            action = self.action_model(states[t], goal)
+            predicted_next_state, delta_var = self.ensemble(states[t], action)
+            delta_means[t + 1] = predicted_next_state - states[t]
             delta_vars[t + 1] = delta_var
+            states[t + 1] = predicted_next_state
 
         # Stack and return the final states, delta means, and delta variances
         states = torch.stack(states[1:], dim=0)

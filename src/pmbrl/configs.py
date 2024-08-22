@@ -34,7 +34,7 @@ def get_config(args):
     config.set_strategy(args.strategy)
     return config
 
-
+#TODO: Experiment with various context_lengths for each environment
 class Config(object):
     def __init__(self):
         self.logdir = "log"
@@ -70,6 +70,7 @@ class Config(object):
 
         self.expl_scale = 1.0
         self.reward_scale = 1.0
+        self.action_noise_scale = 0.1
 
     def set_logdir(self, logdir):
         self.logdir = logdir
@@ -103,6 +104,7 @@ class MountainCarConfig(Config):
         self.n_train_epochs = 100
         self.n_seed_episodes = 1
         self.expl_scale = 1.0
+        self.action_noise_scale = 0.1
         self.n_episodes = 30
         self.ensemble_size = 25
         self.record_every = None
@@ -118,6 +120,7 @@ class CupCatchConfig(Config):
         self.action_repeat = 4
         self.plan_horizon = 12
         self.expl_scale = 0.1
+        self.action_noise_scale = 0.2
         self.record_every = None
         self.n_episodes = 50
 
@@ -146,6 +149,7 @@ class HalfCheetahRunConfig(Config):
         self.use_exploration = True
         self.use_mean = True
         self.expl_scale = 0.1
+        self.action_noise_scale = 0.3
 
 
 class HalfCheetahFlipConfig(Config):
@@ -172,6 +176,7 @@ class HalfCheetahFlipConfig(Config):
         self.use_exploration = True
         self.use_mean = True
         self.expl_scale = 0.1
+        self.action_noise_scale = 0.4
 
 
 class AntMazeConfig(Config):
@@ -200,6 +205,7 @@ class AntMazeConfig(Config):
         self.use_reward = False
         self.use_mean = True
         self.expl_scale = 1.0
+        self.action_noise_scale = 0.5
 
 
 class ReacherConfig(Config):
@@ -227,3 +233,4 @@ class ReacherConfig(Config):
         self.use_reward = True
         self.use_mean = True
         self.expl_scale = 0.1
+        self.action_noise_scale = 0.1
