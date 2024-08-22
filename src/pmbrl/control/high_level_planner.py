@@ -138,6 +138,29 @@ class HighLevelPlanner(nn.Module):
         # Return the refined mean and standard deviation for the goal distribution
         return goal_mean, goal_std_dev
 
+    def return_stats(self):
+        if self.use_reward:
+            reward_stats = self._create_stats(self.trial_rewards)
+        else:
+            reward_stats = {}
+        if self.use_exploration:
+            info_stats = self._create_stats(self.trial_bonuses)
+        else:
+            info_stats = {}
+        self.trial_rewards = []
+        self.trial_bonuses = []
+        return reward_stats, info_stats
+
+    def _create_stats(self, arr):
+        tensor = torch.stack(arr)
+        tensor = tensor.view(-1)
+        return {
+            "max": tensor.max().item(),
+            "min": tensor.min().item(),
+            "mean": tensor.mean().item(),
+            "std": tensor.std().item(),
+        }
+
     # def update(self, state, current_goal, reward, next_state):
     #     """
     #     Update the high-level planner's goals based on agent performance.

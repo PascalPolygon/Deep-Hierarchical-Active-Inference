@@ -35,8 +35,8 @@ class LowLevelPlanner(Planner):
         action = self.action_model(state, goal)
 
         # Add Gaussian noise to the action for exploration
-        noise = torch.randn_like(action) * self.action_noise_scale
-        action = action + noise
+        # noise = torch.randn_like(action) * self.action_noise_scale
+        # action = action + noise
 
         # Clamp the action to be within the valid action range
         action = torch.clamp(action, min=self.env.action_space.low, max=self.env.action_space.high)

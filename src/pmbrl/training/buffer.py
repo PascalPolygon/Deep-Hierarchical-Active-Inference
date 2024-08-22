@@ -19,20 +19,6 @@ class Buffer(object):
         buffer_size=10 ** 6,
         device="cpu",
     ):
-        """
-        Initialize the Buffer.
-
-        Args:
-            state_size (int): Size of the state vector.
-            action_size (int): Size of the action vector.
-            goal_size (int): Size of the goal vector.
-            ensemble_size (int): Number of models in the ensemble.
-            normalizer (Normalizer): Normalizer for the states, actions, and goals.
-            context_length (int): The number of steps a goal is active before resampling.
-            signal_noise (float, optional): Noise scale to add to the states.
-            buffer_size (int, optional): Maximum size of the buffer.
-            device (str, optional): Device to run computations on ("cpu" or "cuda").
-        """
         self.state_size = state_size
         self.action_size = action_size
         self.goal_size = goal_size
@@ -84,7 +70,7 @@ class Buffer(object):
 
         # Update the normalizer with the new experience
         self.normalizer.update(state, action, state_delta, goal)
-    
+
     def update(self, corrected_goal=None):
         """
         Update the high-level buffer with the latest context information.
@@ -93,11 +79,11 @@ class Buffer(object):
         Args:
             corrected_goal (torch.Tensor, Optional): The corrected goal after off-policy correction.
         """
-        if len(self.low_level_states) < self.context_length:
+        if self._total_steps < self.context_length:
             return
 
-        start_idx = self._total_steps - self.context_length
         end_idx = self._total_steps - 1
+        start_idx = end_idx - self.context_length + 1
 
         # Extract context transitions
         st = self.low_level_states[start_idx]
@@ -169,20 +155,9 @@ class Buffer(object):
             yield states, actions, rewards, state_deltas, goals
 
     def __len__(self):
-        """
-        Get the current size of the low-level buffer.
-
-        Returns:
-            int: The number of experiences currently stored in the low-level buffer.
-        """
         return min(self._total_steps, self.buffer_size)
 
     @property
     def total_steps(self):
-        """
-        Get the total number of steps taken so far.
-
-        Returns:
-            int: The total number of steps.
-        """
         return self._total_steps
+
