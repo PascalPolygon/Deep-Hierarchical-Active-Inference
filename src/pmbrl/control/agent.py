@@ -40,7 +40,7 @@ class HierarchicalAgent(object):
         Returns:
             Buffer: The buffer filled with seed episodes.
         """
-        for _ in range(n_episodes):
+        for episode in range(n_episodes):
             state = self.env.reset()
             done = False
             step = 0
@@ -72,10 +72,16 @@ class HierarchicalAgent(object):
                             state, action, reward, next_state = transitions[i]
                             next_goal = goals[i]
                             buffer.add(state, goals[i], action, reward, next_state, next_goal)
+                            if self.logger:
+                                self.logger.log(f"Low-level transition added: state={state}, goal={goals[i]}, action={action}, reward={reward}, next_state={next_state}, next_goal={next_goal}")
+
                     transitions = []  # Clear transitions for the next context
 
                 state = deepcopy(next_state)
                 step += 1
+
+            if self.logger:
+                self.logger.log(f"Episode {episode+1}/{n_episodes} complete.")
 
         return buffer
 
@@ -102,9 +108,14 @@ class HierarchicalAgent(object):
             while not done:
                 if step % self.context_length == 0:
                     self.current_goal = self.high_level_planner(state)
+                    if self.logger:
+                        self.logger.log(f"New high-level goal sampled at step {step}: {self.current_goal}")
+
                     if step > 0:
                         corrected_goal = self.off_policy_goal_correction(buffer, state, exploration_scale=self.high_level_planner.expl_scale)
                         buffer.update(corrected_goal)
+                        if self.logger:
+                            self.logger.log(f"High-level transition updated with corrected goal: {corrected_goal}")
 
                 action, low_level_reward = self.low_level_planner(state, self.current_goal)
                 if action_noise is not None:
@@ -116,11 +127,17 @@ class HierarchicalAgent(object):
                 total_reward += reward
                 total_steps += 1
 
-                if self.logger is not None and total_steps % 25 == 0:
-                    self.logger.log("> Step {} [reward {:.2f}]".format(total_steps, total_reward))
+                if self.logger:
+                    self.logger.log(f"Step {step}: state={state}, goal={self.current_goal}, action={action}, reward={reward}, next_state={next_state}, next_goal={self.next_goal}")
+
+                if self.logger and total_steps % 25 == 0:
+                    self.logger.log(f"Progress log - Total steps: {total_steps}, Total reward: {total_reward}")
 
                 if buffer is not None:
                     buffer.add(deepcopy(state), deepcopy(self.current_goal), action, reward + low_level_reward, deepcopy(next_state), deepcopy(self.next_goal))
+                    if self.logger:
+                        self.logger.log(f"Low-level transition added: state={state}, goal={self.current_goal}, action={action}, reward={reward + low_level_reward}, next_state={next_state}, next_goal={self.next_goal}")
+
                 if recorder is not None:
                     recorder.capture_frame()
 
@@ -137,6 +154,8 @@ class HierarchicalAgent(object):
 
             self.env.close()
             stats = self.high_level_planner.return_stats()
+            if self.logger:
+                self.logger.log(f"Episode complete. Total reward: {total_reward}, Total steps: {total_steps}")
             return total_reward, total_steps, stats
 
     def _add_action_noise(self, action, noise):
@@ -202,5 +221,10 @@ class HierarchicalAgent(object):
                 best_objective = objective
                 best_goal = candidate_goal
 
+        if self.logger:
+            self.logger.log(f"Off-policy goal correction: Selected goal={best_goal} with objective={best_objective}")
+
         return best_goal
+
+
 
