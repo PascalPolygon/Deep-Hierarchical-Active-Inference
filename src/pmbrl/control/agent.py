@@ -28,7 +28,6 @@ class HierarchicalAgent(object):
         self.logger = logger
         self.current_goal = None
         self.next_goal = None
-        self.exploration_measure = exploration_measure  # Pass the selected exploration measure
 
     def get_seed_episodes(self, buffer, n_episodes):
         """
@@ -169,7 +168,6 @@ class HierarchicalAgent(object):
             action = action + noise * torch.randn_like(action)
         return action
     
-    # TODO: 
     def off_policy_goal_correction(self, buffer, state, use_exploration=True, exploration_scale=1.0):
         """
         Implements off-policy goal correction with an optional exploration objective.
@@ -212,7 +210,7 @@ class HierarchicalAgent(object):
             # Calculate the exploration bonus (information gain, variance, or disagreement)
             if use_exploration and self.exploration_measure is not None:
                 delta_means, delta_vars = self.high_level_planner.perform_rollout(state, candidate_goal.unsqueeze(0))
-                exploration_bonus = self.exploration_measure(delta_means, delta_vars).sum().item()
+                exploration_bonus = self.high_level_planner.measure(delta_means, delta_vars).sum().item()
             else:
                 exploration_bonus = 0
 
