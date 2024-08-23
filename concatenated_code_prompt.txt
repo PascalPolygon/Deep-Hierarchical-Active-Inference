@@ -1,0 +1,2270 @@
+
+==============================
+# Begin file: pmbrl/__init__.py
+from . import envs
+from . import control
+from . import envs
+from . import training
+from . import utils
+from .configs import *
+# End file: pmbrl/__init__.py
+
+==============================
+
+==============================
+# Begin file: pmbrl/training/buffer.py
+import torch
+import numpy as np
+
+class Buffer(object):
+    """
+    Buffer for storing experiences (state, action, reward, next state, and goal) during training.
+    This class now manages both a high-level and a low-level buffer.
+    """
+
+    def __init__(
+        self,
+        state_size,
+        action_size,
+        goal_size,
+        ensemble_size,
+        normalizer,
+        context_length,
+        signal_noise=None,
+        buffer_size=10 ** 6,
+        device="cpu",
+    ):
+        self.state_size = state_size
+        self.action_size = action_size
+        self.goal_size = goal_size
+        self.ensemble_size = ensemble_size
+        self.buffer_size = buffer_size
+        self.signal_noise = signal_noise
+        self.device = device
+        self.context_length = context_length
+
+        # Low-level buffer
+        self.low_level_states = np.zeros((buffer_size, state_size))
+        self.low_level_actions = np.zeros((buffer_size, action_size))
+        self.low_level_rewards = np.zeros((buffer_size, 1))
+        self.low_level_goals = np.zeros((buffer_size, goal_size))
+        self.low_level_next_goals = np.zeros((buffer_size, goal_size))
+        self.low_level_state_deltas = np.zeros((buffer_size, state_size))
+
+        # High-level buffer
+        self.high_level_states = []
+        self.high_level_goals = []
+        self.high_level_rewards = []
+        self.high_level_next_states = []
+
+        self.normalizer = normalizer
+        self._total_steps = 0
+
+    def add(self, state, goal, action, reward, next_state, next_goal):
+        #TODO: Verify expected dimensions for state, goal, action, reward, next_state, next_goal
+        """
+        Add a new low-level experience to the buffer.
+
+        Args:
+            state (np.ndarray): The current state.
+            goal (np.ndarray): The current goal.
+            action (np.ndarray): The action taken.
+            reward (float): The reward received.
+            next_state (np.ndarray): The next state after the action.
+            next_goal (np.ndarray): The next goal after the action.
+        """
+        idx = self._total_steps % self.buffer_size
+        state_delta = next_state - state
+
+        self.low_level_states[idx] = state
+        self.low_level_actions[idx] = action
+        self.low_level_rewards[idx] = reward
+        self.low_level_state_deltas[idx] = state_delta
+        self.low_level_goals[idx] = goal
+        self.low_level_next_goals[idx] = next_goal[0]
+        self._total_steps += 1
+
+        self.normalizer.update(state, action, state_delta, goal)
+
+    def update(self, corrected_goal=None):
+        """
+        Update the high-level buffer with the latest context information.
+        This method assumes that the context has been fully populated in the low-level buffer.
+
+        Args:
+            corrected_goal (torch.Tensor, Optional): The corrected goal after off-policy correction.
+        """
+        if self._total_steps < self.context_length:
+            return
+
+        end_idx = self._total_steps - 1
+        start_idx = end_idx - self.context_length + 1
+
+        # Extract context transitions
+        st = self.low_level_states[start_idx]
+        if corrected_goal is not None:
+            self.low_level_goals[start_idx] = corrected_goal.cpu().numpy()  # Use the corrected goal
+        gt = self.low_level_goals[start_idx]
+        Rt_t_c = np.sum(self.low_level_rewards[start_idx:end_idx + 1])
+        st_c = self.low_level_states[end_idx]
+
+        # Append the high-level transition tuple with corrected goal
+        self.high_level_states.append(st)
+        self.high_level_goals.append(gt)
+        self.high_level_rewards.append(Rt_t_c)
+        self.high_level_next_states.append(st_c)
+
+    
+    def get_train_batches(self, batch_size):
+        """
+        Get batches of low-level experiences for training.
+
+        Args:
+            batch_size (int): The size of the batches to return.
+
+        Yields:
+            Tuple of torch.Tensor: Batches of states, actions, rewards, and state deltas.
+        """
+         
+        size = len(self)
+        indices = [
+            np.random.permutation(range(size)) for _ in range(self.ensemble_size)
+        ]
+        indices = np.stack(indices).T
+
+        for i in range(0, size, batch_size):
+            j = min(size, i + batch_size)
+
+            if (j - i) < batch_size and i != 0:
+                return
+
+            batch_size = j - i
+
+            batch_indices = indices[i:j]
+            batch_indices = batch_indices.flatten()
+
+            states = self.low_level_states[batch_indices]
+            actions = self.low_level_actions[batch_indices]
+            rewards = self.low_level_rewards[batch_indices]
+            state_deltas = self.low_level_state_deltas[batch_indices]
+            goals = self.low_level_goals[batch_indices]
+
+            # Convert to torch tensors
+            states = torch.from_numpy(states).float().to(self.device)
+            actions = torch.from_numpy(actions).float().to(self.device)
+            rewards = torch.from_numpy(rewards).float().to(self.device)
+            state_deltas = torch.from_numpy(state_deltas).float().to(self.device)
+            goals = torch.from_numpy(goals).float().to(self.device)
+
+            if self.signal_noise is not None:
+                states = states + self.signal_noise * torch.randn_like(states)
+
+            # Reshape for ensemble processing
+            states = states.reshape(self.ensemble_size, batch_size, self.state_size)
+            actions = actions.reshape(self.ensemble_size, batch_size, self.action_size)
+            rewards = rewards.reshape(self.ensemble_size, batch_size, 1)
+            state_deltas = state_deltas.reshape(
+                self.ensemble_size, batch_size, self.state_size
+            )
+            goals = goals.reshape(self.ensemble_size, batch_size, self.goal_size)
+
+            yield states, actions, rewards, state_deltas, goals
+    
+    def get_low_level_train_batches(self, batch_size):
+        """
+        Get batches of low-level experiences for training.
+
+        Args:
+            batch_size (int): The size of the batches to return.
+
+        Yields:
+            Tuple of torch.Tensor: Batches of states, goals, and actions.
+        """
+        size = len(self.low_level_states)
+        indices = np.random.permutation(size)
+
+        for i in range(0, size, batch_size):
+            j = min(size, i + batch_size)
+            if (j - i) < batch_size and i != 0:
+                return
+
+            batch_indices = indices[i:j]
+            batch_size = j - i
+
+            # Fetch and convert to tensors
+            states = torch.from_numpy(self.low_level_states[batch_indices]).float().to(self.device)
+            goals = torch.from_numpy(self.low_level_goals[batch_indices]).float().to(self.device)
+            actions = torch.from_numpy(self.low_level_actions[batch_indices]).float().to(self.device)
+
+            # Reshape for ensemble processing
+            states = states.reshape(self.ensemble_size, batch_size, self.state_size)
+            goals = goals.reshape(self.ensemble_size, batch_size, self.goal_size)
+            actions = actions.reshape(self.ensemble_size, batch_size, self.action_size)
+
+            yield states, goals, actions
+
+    def get_high_level_train_batches(self, batch_size):
+        """
+        Get batches of high-level experiences for training.
+
+        Args:
+            batch_size (int): The size of the batches to return.
+
+        Yields:
+            Tuple of torch.Tensor: Batches of states, goals, rewards, and state deltas.
+        """
+        size = len(self.high_level_states)
+        indices = np.random.permutation(size)
+
+        for i in range(0, size, batch_size):
+            j = min(size, i + batch_size)
+            if (j - i) < batch_size and i != 0:
+                return
+
+            batch_indices = indices[i:j]
+            batch_size = j - i
+
+            # Fetch high-level data and convert to tensors
+            states = torch.from_numpy(np.array(self.high_level_states)[batch_indices]).float().to(self.device)
+            goals = torch.from_numpy(np.array(self.high_level_goals)[batch_indices]).float().to(self.device)
+            rewards = torch.from_numpy(np.array(self.high_level_rewards)[batch_indices]).float().to(self.device)
+            goal_deltas = torch.from_numpy(np.array(self.high_level_next_states)[batch_indices] - np.array(self.high_level_states)[batch_indices]).float().to(self.device)
+
+            # Reshape for ensemble processing
+            states = states.reshape(self.ensemble_size, batch_size, self.state_size)
+            goals = goals.reshape(self.ensemble_size, batch_size, self.goal_size)
+            rewards = rewards.reshape(self.ensemble_size, batch_size, 1)
+            goal_deltas = goal_deltas.reshape(self.ensemble_size, batch_size, self.state_size)
+
+            yield states, goals, rewards, goal_deltas
+
+    def __len__(self):
+        return min(self._total_steps, self.buffer_size)
+
+    @property
+    def total_steps(self):
+        return self._total_steps
+
+
+# End file: pmbrl/training/buffer.py
+
+==============================
+
+==============================
+# Begin file: pmbrl/training/trainer.py
+import torch
+
+class HierarchicalTrainer(object):
+    """
+    Trainer class for hierarchical active inference agents.
+    This class separately trains the high-level and low-level models using a shared buffer.
+    """
+
+    def __init__(
+        self,
+        high_level_ensemble_model,
+        high_level_reward_model,
+        low_level_action_model,
+        buffer,
+        n_train_epochs,
+        batch_size,
+        learning_rate,
+        epsilon,
+        grad_clip_norm,
+        logger=None,
+        device="cpu",
+    ):
+        """
+        Initialize the HierarchicalTrainer.
+
+        Args:
+            high_level_ensemble_model (nn.Module): The high-level ensemble model.
+            high_level_reward_model (nn.Module): The high-level reward model.
+            low_level_action_model (nn.Module): The low-level action model.
+            buffer (Buffer): Shared buffer for storing high-level and low-level experiences.
+            n_train_epochs (int): Number of training epochs.
+            batch_size (int): Batch size for training.
+            learning_rate (float): Learning rate for the optimizer.
+            epsilon (float): Epsilon value for the Adam optimizer.
+            grad_clip_norm (float): Gradient clipping norm.
+            logger (Logger, optional): Logger for recording training information.
+        """
+        self.high_level_ensemble = high_level_ensemble_model
+        self.high_level_reward = high_level_reward_model
+        self.low_level_action = low_level_action_model
+        self.buffer = buffer
+        self.n_train_epochs = n_train_epochs
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
+        self.epsilon = epsilon
+        self.grad_clip_norm = grad_clip_norm
+        self.logger = logger
+        self.device = device
+
+        # Separate optimizers for high-level and low-level models
+        self.high_level_params = list(high_level_ensemble_model.parameters()) + list(high_level_reward_model.parameters())
+        self.low_level_params = list(low_level_action_model.parameters())
+        self.high_level_optim = torch.optim.Adam(self.high_level_params, lr=learning_rate, eps=epsilon)
+        self.low_level_optim = torch.optim.Adam(self.low_level_params, lr=learning_rate, eps=epsilon)
+
+    def train(self):
+        """
+        Main training loop that iterates over the specified number of epochs.
+        Separately trains the high-level and low-level models.
+        """
+        high_level_e_losses = []
+        high_level_r_losses = []
+        low_level_a_losses = []
+        n_batches_high = []
+        n_batches_low = []
+
+        for epoch in range(1, self.n_train_epochs + 1):
+            high_level_e_losses.append([])
+            high_level_r_losses.append([])
+            low_level_a_losses.append([])
+            n_batches_high.append(0)
+            n_batches_low.append(0)
+
+            # Train high-level models
+            self._train_high_level(epoch, high_level_e_losses, high_level_r_losses, n_batches_high)
+
+            # Train low-level action model
+            self._train_low_level(epoch, low_level_a_losses, n_batches_low)
+
+        return (
+            self._get_avg_loss(high_level_e_losses, n_batches_high, epoch), # high-level ensemble loss
+            self._get_avg_loss(high_level_r_losses, n_batches_high, epoch), # high-level reward loss
+            self._get_avg_loss(low_level_a_losses, n_batches_low, epoch), # low-level action model loss
+        )
+
+    def _train_high_level(self, epoch, e_losses, r_losses, n_batches):
+        """
+        Training loop for the high-level models.
+
+        Args:
+            epoch (int): Current training epoch.
+            e_losses (list): List to store ensemble model losses.
+            r_losses (list): List to store reward model losses.
+            n_batches (list): List to store the number of batches per epoch.
+        """
+        for (states, goals, rewards, goal_deltas) in self.buffer.get_high_level_train_batches(self.batch_size):
+            self.high_level_ensemble.train()
+            self.high_level_reward.train()
+
+            # Zero the gradients for the high-level models
+            self.high_level_optim.zero_grad()
+
+            # Compute losses for ensemble and reward models
+            e_loss = self.high_level_ensemble.loss(states, goals, goal_deltas)
+            r_loss = self.high_level_reward.loss(states, goals, rewards)
+            
+            # Backpropagate the losses
+            (e_loss + r_loss).backward()
+            
+            # Clip gradients to prevent exploding gradients
+            torch.nn.utils.clip_grad_norm_(self.high_level_params, self.grad_clip_norm, norm_type=2)
+            
+            # Perform a gradient update step
+            self.high_level_optim.step()
+
+            e_losses[epoch - 1].append(e_loss.item())
+            r_losses[epoch - 1].append(r_loss.item())
+            n_batches[epoch - 1] += 1
+
+        # Log the average losses every 20 epochs
+        if self.logger is not None and epoch % 20 == 0:
+            avg_e_loss = self._get_avg_loss(e_losses, n_batches, epoch)
+            avg_r_loss = self._get_avg_loss(r_losses, n_batches, epoch)
+            message = "> High-Level Train epoch {} [ensemble {:.2f} | reward {:.2f}]"
+            self.logger.log(message.format(epoch, avg_e_loss, avg_r_loss))
+
+    def _train_low_level(self, epoch, a_losses, n_batches):
+        """
+        Training loop for the low-level action model.
+
+        Args:
+            epoch (int): Current training epoch.
+            a_losses (list): List to store action model losses.
+            n_batches (list): List to store the number of batches per epoch.
+        """
+        for (states, goals, actions) in self.buffer.get_low_level_train_batches(self.batch_size):
+            self.low_level_action.train()
+
+            # Zero the gradients for the low-level action model
+            self.low_level_optim.zero_grad()
+
+            # Compute loss for the low-level action model
+            a_loss = self.low_level_action.loss(states, goals, actions)
+            
+            # Backpropagate the loss
+            a_loss.backward()
+            
+            # Clip gradients to prevent exploding gradients
+            torch.nn.utils.clip_grad_norm_(self.low_level_params, self.grad_clip_norm, norm_type=2)
+            
+            # Perform a gradient update step
+            self.low_level_optim.step()
+
+            a_losses[epoch - 1].append(a_loss.item())
+            n_batches[epoch - 1] += 1
+
+        # Log the average loss every 20 epochs
+        if self.logger is not None and epoch % 20 == 0:
+            avg_a_loss = self._get_avg_loss(a_losses, n_batches, epoch)
+            message = "> Low-Level Train epoch {} [action {:.2f}]"
+            self.logger.log(message.format(epoch, avg_a_loss))
+
+    def reset_models(self):
+        """
+        Resets the parameters of both high-level and low-level models,
+        and reinitializes the optimizers.
+        """
+        self.high_level_ensemble.reset_parameters()
+        self.high_level_reward.reset_parameters()
+        self.low_level_action.reset_parameters()
+
+        self.high_level_params = list(self.high_level_ensemble.parameters()) + list(self.high_level_reward.parameters())
+        self.low_level_params = list(self.low_level_action.parameters())
+
+        self.high_level_optim = torch.optim.Adam(self.high_level_params, lr=self.learning_rate, eps=self.epsilon)
+        self.low_level_optim = torch.optim.Adam(self.low_level_params, lr=self.learning_rate, eps=self.epsilon)
+    
+    @staticmethod
+    def _get_avg_loss(losses, n_batches, epoch):
+        """
+        Computes the average loss over all batches for the given epoch.
+
+        Args:
+            losses (list): List of loss values for each batch.
+            n_batches (list): List of the number of batches per epoch.
+            epoch (int): Current epoch number.
+
+        Returns:
+            float: Average loss for the epoch.
+        """
+        return sum(losses[epoch - 1]) / n_batches[epoch - 1] if n_batches[epoch - 1] > 0 else float("inf")
+
+# End file: pmbrl/training/trainer.py
+
+==============================
+
+==============================
+# Begin file: pmbrl/training/normalizer.py
+import numpy as np
+import torch
+from copy import deepcopy
+
+class Normalizer(object):
+    """
+    Normalizer for states, actions, state deltas, and goals.
+    Maintains running statistics for normalization.
+    """
+
+    def __init__(self):
+        """
+        Initialize the Normalizer with empty statistics.
+        """
+        self.state_mean = None
+        self.state_sk = None
+        self.state_stdev = None
+        self.action_mean = None
+        self.action_sk = None
+        self.action_stdev = None
+        self.state_delta_mean = None
+        self.state_delta_sk = None
+        self.state_delta_stdev = None
+        self.goal_mean = None
+        self.goal_sk = None
+        self.goal_stdev = None
+        self.count = 0
+
+    @staticmethod
+    def update_mean(mu_old, addendum, n):
+        """
+        Update the mean with a new sample.
+
+        Args:
+            mu_old (np.ndarray): The old mean.
+            addendum (np.ndarray): The new sample.
+            n (int): The sample count.
+
+        Returns:
+            np.ndarray: The updated mean.
+        """
+        mu_new = mu_old + (addendum - mu_old) / n
+        return mu_new
+
+    @staticmethod
+    def update_sk(sk_old, mu_old, mu_new, addendum):
+        """
+        Update the sum of squares of differences from the mean.
+
+        Args:
+            sk_old (np.ndarray): The old sum of squares.
+            mu_old (np.ndarray): The old mean.
+            mu_new (np.ndarray): The new mean.
+            addendum (np.ndarray): The new sample.
+
+        Returns:
+            np.ndarray: The updated sum of squares.
+        """
+        sk_new = sk_old + (addendum - mu_old) * (addendum - mu_new)
+        return sk_new
+
+    def update(self, state, action, state_delta, goal=None):
+        """
+        Update the normalizer with new state, action, state delta, and optionally goal.
+
+        Args:
+            state (np.ndarray): The current state.
+            action (np.ndarray): The action taken.
+            state_delta (np.ndarray): The change in state.
+            goal (np.ndarray): The high-level goal, if provided.
+        """
+        self.count += 1
+
+        if self.count == 1:
+            self.state_mean = state.copy()
+            self.state_sk = np.zeros_like(state)
+            self.state_stdev = np.zeros_like(state)
+            self.action_mean = action.copy()
+            self.action_sk = np.zeros_like(action)
+            self.action_stdev = np.zeros_like(action)
+            self.state_delta_mean = state_delta.copy()
+            self.state_delta_sk = np.zeros_like(state_delta)
+            self.state_delta_stdev = np.zeros_like(state_delta)
+            if goal is not None:
+                self.goal_mean = goal.copy()
+                self.goal_sk = np.zeros_like(goal)
+                self.goal_stdev = np.zeros_like(goal)
+            return
+
+        # Store old means for update calculations
+        state_mean_old = self.state_mean.copy()
+        action_mean_old = self.action_mean.copy()
+        state_delta_mean_old = self.state_delta_mean.copy()
+        if goal is not None:
+            goal_mean_old = self.goal_mean.copy()
+
+        # Update means
+        self.state_mean = self.update_mean(self.state_mean, state, self.count)
+        self.action_mean = self.update_mean(self.action_mean, action, self.count)
+        self.state_delta_mean = self.update_mean(self.state_delta_mean, state_delta, self.count)
+        if goal is not None:
+            self.goal_mean = self.update_mean(self.goal_mean, goal, self.count)
+
+        # Update sums of squares
+        self.state_sk = self.update_sk(self.state_sk, state_mean_old, self.state_mean, state)
+        self.action_sk = self.update_sk(self.action_sk, action_mean_old, self.action_mean, action)
+        self.state_delta_sk = self.update_sk(self.state_delta_sk, state_delta_mean_old, self.state_delta_mean, state_delta)
+        if goal is not None:
+            self.goal_sk = self.update_sk(self.goal_sk, goal_mean_old, self.goal_mean, goal)
+
+        # Calculate standard deviations
+        self.state_stdev = np.sqrt(self.state_sk / self.count)
+        self.action_stdev = np.sqrt(self.action_sk / self.count)
+        self.state_delta_stdev = np.sqrt(self.state_delta_sk / self.count)
+        if goal is not None:
+            self.goal_stdev = np.sqrt(self.goal_sk / self.count)
+
+    @staticmethod
+    def setup_vars(x, mean, stdev):
+        """
+        Prepare mean and standard deviation tensors.
+
+        Args:
+            x (torch.Tensor): The input tensor.
+            mean (np.ndarray): The mean values.
+            stdev (np.ndarray): The standard deviation values.
+
+        Returns:
+            Tuple of torch.Tensor: The mean and standard deviation tensors.
+        """
+        mean = torch.from_numpy(mean).float().to(x.device)
+        stdev = torch.from_numpy(stdev).float().to(x.device)
+        return mean, stdev
+
+    def _normalize(self, x, mean, stdev):
+        """
+        Normalize a tensor.
+
+        Args:
+            x (torch.Tensor): The input tensor.
+            mean (torch.Tensor): The mean tensor.
+            stdev (torch.Tensor): The standard deviation tensor.
+
+        Returns:
+            torch.Tensor: The normalized tensor.
+        """
+        mean, stdev = self.setup_vars(x, mean, stdev)
+        n = x - mean
+        n = n / torch.clamp(stdev, min=1e-8)
+        return n
+
+    def normalize_states(self, states):
+        """
+        Normalize the states.
+
+        Args:
+            states (torch.Tensor): The state tensor to normalize.
+
+        Returns:
+            torch.Tensor: The normalized states.
+        """
+        return self._normalize(states, self.state_mean, self.state_stdev)
+
+    def normalize_actions(self, actions):
+        """
+        Normalize the actions.
+
+        Args:
+            actions (torch.Tensor): The action tensor to normalize.
+
+        Returns:
+            torch.Tensor: The normalized actions.
+        """
+        return self._normalize(actions, self.action_mean, self.action_stdev)
+
+    def normalize_state_deltas(self, state_deltas):
+        """
+        Normalize the state deltas.
+
+        Args:
+            state_deltas (torch.Tensor): The state delta tensor to normalize.
+
+        Returns:
+            torch.Tensor: The normalized state deltas.
+        """
+        return self._normalize(state_deltas, self.state_delta_mean, self.state_delta_stdev)
+
+    def denormalize_state_delta_means(self, state_deltas_means):
+        """
+        Denormalize state delta means.
+
+        Args:
+            state_deltas_means (torch.Tensor): The normalized state delta means.
+
+        Returns:
+            torch.Tensor: The denormalized state delta means.
+        """
+        mean, stdev = self.setup_vars(state_deltas_means, self.state_delta_mean, self.state_delta_stdev)
+        return state_deltas_means * stdev + mean
+
+    def denormalize_state_delta_vars(self, state_delta_vars):
+        """
+        Denormalize state delta variances.
+
+        Args:
+            state_delta_vars (torch.Tensor): The normalized state delta variances.
+
+        Returns:
+            torch.Tensor: The denormalized state delta variances.
+        """
+        _, stdev = self.setup_vars(state_delta_vars, self.state_delta_mean, self.state_delta_stdev)
+        return state_delta_vars * (stdev ** 2)
+
+    def renormalize_state_delta_means(self, state_deltas_means):
+        """
+        Renormalize state delta means.
+
+        Args:
+            state_deltas_means (torch.Tensor): The state delta means to renormalize.
+
+        Returns:
+            torch.Tensor: The renormalized state delta means.
+        """
+        mean, stdev = self.setup_vars(state_deltas_means, self.state_delta_mean, self.state_delta_stdev)
+        return (state_deltas_means - mean) / torch.clamp(stdev, min=1e-8)
+
+    def renormalize_state_delta_vars(self, state_delta_vars):
+        """
+        Renormalize state delta variances.
+
+        Args:
+            state_delta_vars (torch.Tensor): The state delta variances to renormalize.
+
+        Returns:
+            torch.Tensor: The renormalized state delta variances.
+        """
+        _, stdev = self.setup_vars(state_delta_vars, self.state_delta_mean, self.state_delta_stdev)
+        return state_delta_vars / (torch.clamp(stdev, min=1e-8) ** 2)
+    
+    def normalize_goals(self, goals):
+        """
+        Normalize the goals.
+
+        Args:
+            goals (torch.Tensor): The goal tensor to normalize.
+
+        Returns:
+            torch.Tensor: The normalized goals.
+        """
+        return self._normalize(goals, self.goal_mean, self.goal_stdev)
+
+    def denormalize_goals(self, goals):
+        """
+        Denormalize the goals.
+
+        Args:
+            goals (torch.Tensor): The normalized goal tensor.
+
+        Returns:
+            torch.Tensor: The denormalized goals.
+        """
+        return goals * self.goal_stdev + self.goal_mean
+
+    def normalize_goal_deltas(self, goal_deltas):
+        """
+        Normalize the goal deltas.
+
+        Args:
+            goal_deltas (torch.Tensor): The goal delta tensor to normalize.
+
+        Returns:
+            torch.Tensor: The normalized goal deltas.
+        """
+        return self._normalize(goal_deltas, self.goal_mean, self.goal_stdev)
+    
+    def renormalize_goal_deltas(self, goal_deltas):
+        """
+        Renormalize goal deltas.
+
+        Args:
+            goal_deltas (torch.Tensor): The goal deltas to renormalize.
+
+        Returns:
+            torch.Tensor: The renormalized goal deltas.
+        """
+        mean, stdev = self.setup_vars(goal_deltas, self.goal_mean, self.goal_stdev)
+        return (goal_deltas - mean) / torch.clamp(stdev, min=1e-8)
+    
+    def denormalize_goal_deltas(self, goal_deltas):
+        """
+        Denormalize goal deltas.
+
+        Args:
+            goal_deltas (torch.Tensor): The normalized goal deltas.
+
+        Returns:
+            torch.Tensor: The denormalized goal deltas.
+        """
+        mean, stdev = self.setup_vars(goal_deltas, self.goal_mean, self.goal_stdev)
+        return goal_deltas * stdev + mean
+
+# End file: pmbrl/training/normalizer.py
+
+==============================
+
+==============================
+# Begin file: pmbrl/models/models.py
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.distributions import Normal
+
+def swish(x):
+    """
+    Swish activation function.
+    """
+    return x * torch.sigmoid(x)
+
+class EnsembleDenseLayer(nn.Module):
+    """
+    A dense layer for ensemble models that supports a swish or linear activation function.
+    """
+
+    def __init__(self, in_size, out_size, ensemble_size, act_fn="swish"):
+        """
+        Initialize the EnsembleDenseLayer.
+
+        Args:
+            in_size (int): Input dimension size.
+            out_size (int): Output dimension size.
+            ensemble_size (int): Number of ensemble members.
+            act_fn (str): Activation function name ("swish" or "linear").
+        """
+        super().__init__()
+        self.in_size = in_size
+        self.out_size = out_size
+        self.ensemble_size = ensemble_size
+        self.act_fn_name = act_fn
+        self.act_fn = self._get_act_fn(self.act_fn_name)
+        self.reset_parameters()
+
+    def forward(self, x):
+        """
+        Forward pass through the dense layer.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after applying the linear transformation and activation function.
+        """
+        x = x.to(self.weights.dtype)  # Ensure the input tensor has the same dtype as the weights
+        op = torch.baddbmm(self.biases, x, self.weights)
+        op = self.act_fn(op)
+        return op
+
+    def reset_parameters(self):
+        """
+        Initialize the weights and biases of the layer.
+        """
+        weights = torch.zeros(self.ensemble_size, self.in_size, self.out_size).float()
+        biases = torch.zeros(self.ensemble_size, 1, self.out_size).float()
+
+        for weight in weights:
+            self._init_weight(weight, self.act_fn_name)
+
+        self.weights = nn.Parameter(weights)
+        self.biases = nn.Parameter(biases)
+
+    def _init_weight(self, weight, act_fn_name):
+        """
+        Initialize the weights using Xavier initialization.
+
+        Args:
+            weight (torch.Tensor): Weight tensor.
+            act_fn_name (str): Name of the activation function ("swish" or "linear").
+        """
+        if act_fn_name == "swish":
+            nn.init.xavier_uniform_(weight)
+        elif act_fn_name == "linear":
+            nn.init.xavier_normal_(weight)
+
+    def _get_act_fn(self, act_fn_name):
+        """
+        Retrieve the activation function based on its name.
+
+        Args:
+            act_fn_name (str): Name of the activation function ("swish" or "linear").
+
+        Returns:
+            Callable: Activation function.
+        """
+        if act_fn_name == "swish":
+            return swish
+        elif act_fn_name == "linear":
+            return lambda x: x
+
+class EnsembleModel(nn.Module):
+    """
+    High-level ensemble model that predicts state changes given the current state and goal.
+    """
+
+    def __init__(self, in_size, out_size, hidden_size, ensemble_size, normalizer, device="cpu"):
+        """
+        Initialize the HighLevelEnsembleModel.
+
+        Args:
+            in_size (int): Dimension of the state space + goal space.
+            out_size (int): Dimension of the goal space.
+            hidden_size (int): Dimension of the hidden layers.
+            ensemble_size (int): Number of ensemble members.
+            normalizer (Normalizer): Normalizer for the input data.
+            device (str): Device to run the model on ("cpu" or "cuda").
+        """
+        super().__init__()
+        self.fc_1 = EnsembleDenseLayer(in_size, hidden_size, ensemble_size, act_fn="swish")
+        self.fc_2 = EnsembleDenseLayer(hidden_size, hidden_size, ensemble_size, act_fn="swish")
+        self.fc_3 = EnsembleDenseLayer(hidden_size, hidden_size, ensemble_size, act_fn="swish")
+        self.fc_4 = EnsembleDenseLayer(hidden_size, out_size * 2, ensemble_size, act_fn="linear")
+
+        self.ensemble_size = ensemble_size
+        self.normalizer = normalizer
+        self.device = device
+        self.max_logvar = -1
+        self.min_logvar = -5
+        self.to(device)
+
+    def forward(self, states, goals):
+        """
+        Forward pass through the high-level ensemble model.
+
+        Args:
+            states (torch.Tensor): Input states.
+            goals (torch.Tensor): Input goals.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Mean and variance of the predicted state deltas.
+        """
+        norm_states, norm_goals = self._pre_process_model_inputs(states, goals)
+        norm_delta_mean, norm_delta_var = self._propagate_network(norm_states, norm_goals)
+        delta_mean, delta_var = self._post_process_model_outputs(norm_delta_mean, norm_delta_var)
+        return delta_mean, delta_var
+
+    def loss(self, states, goals, goal_deltas):
+        """
+        Compute the loss for the high-level ensemble model.
+
+        Args:
+            states (torch.Tensor): Input states.
+            goals (torch.Tensor): Input goals.
+            goal_deltas (torch.Tensor): Target state deltas.
+
+        Returns:
+            torch.Tensor: Loss value.
+        """
+        states, goals = self._pre_process_model_inputs(states, goals)
+        delta_targets = self._pre_process_model_targets(goal_deltas)
+        delta_mu, delta_var = self._propagate_network(states, goals)
+        loss = (delta_mu - delta_targets) ** 2 / delta_var + torch.log(delta_var)
+        loss = loss.mean(-1).mean(-1).sum()
+        return loss
+    
+    def sample(self, mean, var):
+        return Normal(mean, torch.sqrt(var)).sample()
+
+    def reset_parameters(self):
+        self.fc_1.reset_parameters()
+        self.fc_2.reset_parameters()
+        self.fc_3.reset_parameters()
+        self.fc_4.reset_parameters()
+        self.to(self.device)
+
+    def _propagate_network(self, states, goals):
+        """
+        Forward pass through the network layers.
+
+        Args:
+            states (torch.Tensor): Normalized states.
+            goals (torch.Tensor): Normalized goals.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Mean and variance of the state deltas.
+        """
+        print(f'states.shape: {states.shape}')
+        print(f'goals.shape: {goals.shape}')
+        inp = torch.cat((states, goals), dim=2)  # Concatenate states and goals
+        op = self.fc_1(inp)  # First hidden layer
+        op = self.fc_2(op)   # Second hidden layer
+        op = self.fc_3(op)   # Third hidden layer
+        op = self.fc_4(op)   # Output layer
+
+        delta_mean, delta_logvar = torch.split(op, op.size(2) // 2, dim=2)
+        delta_logvar = torch.sigmoid(delta_logvar)
+        delta_logvar = self.min_logvar + (self.max_logvar - self.min_logvar) * delta_logvar
+        delta_var = torch.exp(delta_logvar)
+
+        return delta_mean, delta_var
+
+    def _pre_process_model_inputs(self, states, goals):
+        """
+        Normalize the states and goals.
+
+        Args:
+            states (torch.Tensor): Input states.
+            goals (torch.Tensor): Input goals.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Normalized states and goals.
+        """
+        states = self.normalizer.normalize_states(states)
+        goals = self.normalizer.normalize_goals(goals)
+        return states, goals
+
+    def _pre_process_model_targets(self, goal_deltas):
+        """
+        Normalize the target state deltas.
+
+        Args:
+            goal_deltas (torch.Tensor): Target state deltas.
+
+        Returns:
+            torch.Tensor: Normalized target state deltas.
+        """
+        return self.normalizer.normalize_goal_deltas(goal_deltas)
+
+    def _post_process_model_outputs(self, delta_mean, delta_var):
+        """
+        Denormalize the model outputs (mean and variance of state deltas).
+
+        Args:
+            delta_mean (torch.Tensor): Predicted mean state deltas.
+            delta_var (torch.Tensor): Predicted variance of state deltas.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Denormalized mean and variance.
+        """
+        delta_mean = self.normalizer.denormalize_state_delta_means(delta_mean)
+        delta_var = self.normalizer.denormalize_state_delta_vars(delta_var)
+        return delta_mean, delta_var
+
+class LowLevelEnsembleModel(nn.Module):
+    """
+    Low-level ensemble model that predicts state changes given the current state and action.
+    """
+
+    def __init__(self, state_size, action_size, hidden_size, ensemble_size, normalizer, device="cpu"):
+        """
+        Initialize the LowLevelEnsembleModel.
+
+        Args:
+            state_size (int): Dimension of the state space.
+            action_size (int): Dimension of the action space.
+            hidden_size (int): Dimension of the hidden layers.
+            ensemble_size (int): Number of ensemble members.
+            normalizer (Normalizer): Normalizer for the input data.
+            device (str): Device to run the model on ("cpu" or "cuda").
+        """
+        super().__init__()
+        self.fc_1 = EnsembleDenseLayer(state_size + action_size, hidden_size, ensemble_size, act_fn="swish")
+        self.fc_2 = EnsembleDenseLayer(hidden_size, hidden_size, ensemble_size, act_fn="swish")
+        self.fc_3 = EnsembleDenseLayer(hidden_size, hidden_size, ensemble_size, act_fn="swish")
+        self.fc_4 = EnsembleDenseLayer(hidden_size, state_size * 2, ensemble_size, act_fn="linear")
+
+        self.ensemble_size = ensemble_size
+        self.normalizer = normalizer
+        self.device = device
+        self.max_logvar = -1
+        self.min_logvar = -5
+        self.to(device)
+
+    def forward(self, states, actions):
+        """
+        Forward pass through the low-level ensemble model.
+
+        Args:
+            states (torch.Tensor): Input states.
+            actions (torch.Tensor): Input actions.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Mean and variance of the predicted state deltas.
+        """
+        norm_states, norm_actions = self._pre_process_model_inputs(states, actions)
+        norm_delta_mean, norm_delta_var = self._propagate_network(norm_states, norm_actions)
+        delta_mean, delta_var = self._post_process_model_outputs(norm_delta_mean, norm_delta_var)
+        return delta_mean, delta_var
+
+    def loss(self, states, actions, state_deltas):
+        """
+        Compute the loss for the low-level ensemble model.
+
+        Args:
+            states (torch.Tensor): Input states.
+            actions (torch.Tensor): Input actions.
+            state_deltas (torch.Tensor): Target state deltas.
+
+        Returns:
+            torch.Tensor: Loss value.
+        """
+        states, actions = self._pre_process_model_inputs(states, actions)
+        delta_targets = self._pre_process_model_targets(state_deltas)
+        delta_mu, delta_var = self._propagate_network(states, actions)
+        loss = (delta_mu - delta_targets) ** 2 / delta_var + torch.log(delta_var)
+        loss = loss.mean(-1).mean(-1).sum()
+        return loss
+
+    def sample(self, mean, var):
+        return Normal(mean, torch.sqrt(var)).sample()
+
+    def reset_parameters(self):
+        self.fc_1.reset_parameters()
+        self.fc_2.reset_parameters()
+        self.fc_3.reset_parameters()
+        self.fc_4.reset_parameters()
+        self.to(self.device)
+
+    def _propagate_network(self, states, actions):
+        """
+        Forward pass through the network layers.
+
+        Args:
+            states (torch.Tensor): Normalized states.
+            actions (torch.Tensor): Normalized actions.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Mean and variance of the state deltas.
+        """
+        inp = torch.cat((states, actions), dim=2)  # Concatenate states and actions
+        op = self.fc_1(inp)  # First hidden layer
+        op = self.fc_2(op)   # Second hidden layer
+        op = self.fc_3(op)   # Third hidden layer
+        op = self.fc_4(op)   # Output layer
+
+        delta_mean, delta_logvar = torch.split(op, op.size(2) // 2, dim=2)
+        delta_logvar = torch.sigmoid(delta_logvar)
+        delta_logvar = self.min_logvar + (self.max_logvar - self.min_logvar) * delta_logvar
+        delta_var = torch.exp(delta_logvar)
+
+        return delta_mean, delta_var
+
+    def _pre_process_model_inputs(self, states, actions):
+        """
+        Normalize the states and actions.
+
+        Args:
+            states (torch.Tensor): Input states.
+            actions (torch.Tensor): Input actions.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Normalized states and actions.
+        """
+        states = self.normalizer.normalize_states(states)
+        actions = self.normalizer.normalize_actions(actions)
+        return states, actions
+
+    def _pre_process_model_targets(self, state_deltas):
+        """
+        Normalize the target state deltas.
+
+        Args:
+            state_deltas (torch.Tensor): Target state deltas.
+
+        Returns:
+            torch.Tensor: Normalized target state deltas.
+        """
+        return self.normalizer.normalize_state_deltas(state_deltas)
+
+    def _post_process_model_outputs(self, delta_mean, delta_var):
+        """
+        Denormalize the model outputs (mean and variance of state deltas).
+
+        Args:
+            delta_mean (torch.Tensor): Predicted mean state deltas.
+            delta_var (torch.Tensor): Predicted variance of state deltas.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Denormalized mean and variance.
+        """
+        delta_mean = self.normalizer.denormalize_state_delta_means(delta_mean)
+        delta_var = self.normalizer.denormalize_state_delta_vars(delta_var)
+        return delta_mean, delta_var
+
+class RewardModel(nn.Module):
+    def __init__(self, in_size, hidden_size, act_fn="relu", device="cpu"):
+        super().__init__()
+        self.in_size = in_size
+        self.hidden_size = hidden_size
+        self.device = device
+        self.act_fn = getattr(F, act_fn)
+        self.reset_parameters()
+        self.to(device)
+
+    def forward(self, states, goals):
+        # print("in_size: ", self.in_size)
+        # print("states.shape: ", states.shape)
+        # print("actions.shape: ", goals.shape)
+        inp = torch.cat((states, goals), dim=-1)
+        reward = self.act_fn(self.fc_1(inp))
+        reward = self.act_fn(self.fc_2(reward))
+        reward = self.fc_3(reward).squeeze(dim=1)
+        return reward
+
+    def loss(self, states, goals, rewards):
+        r_hat = self(states, goals)
+        return F.mse_loss(r_hat, rewards)
+
+    def reset_parameters(self):
+        self.fc_1 = nn.Linear(self.in_size, self.hidden_size)
+        self.fc_2 = nn.Linear(self.hidden_size, self.hidden_size)
+        self.fc_3 = nn.Linear(self.hidden_size, 1)
+        self.to(self.device)
+
+class ActionModel(nn.Module):
+    def __init__(self, state_size, goal_size, action_size, hidden_size, device="cpu"):
+        super(ActionModel, self).__init__()
+        self.fc1 = nn.Linear(state_size + goal_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, action_size)
+        self.device = device
+        self.to(device)
+
+    def forward(self, state, goal):
+          # Convert state and goal to tensors if they are numpy arrays
+        # Debugging: Print the shapes of state and goal
+        # print(f"State shape: {state.shape}, Goal shape: {goal.shape}")
+        x = torch.cat([state, goal], dim=-1)
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        action = torch.tanh(self.fc3(x))  # Use tanh to bound the action space
+        return action
+
+    def loss(self, states, goals, actions):
+        predicted_actions = self.forward(states, goals)
+        return F.mse_loss(predicted_actions, actions)
+
+    def reset_parameters(self):
+        self.fc1.reset_parameters()
+        self.fc2.reset_parameters()
+        self.fc3.reset_parameters()
+# End file: pmbrl/models/models.py
+
+==============================
+
+==============================
+# Begin file: pmbrl/control/planner.py
+# pylint: disable=not-callable
+# pylint: disable=no-member
+
+import torch
+import torch.nn as nn
+
+from pmbrl.control.measures import InformationGain, Disagreement, Variance, Random
+
+class Planner(nn.Module):
+    def __init__(
+        self,
+        ensemble,
+        reward_model,
+        action_size,
+        ensemble_size,
+        plan_horizon,
+        optimisation_iters,
+        n_candidates,
+        top_candidates,
+        use_reward=True,
+        use_exploration=True,
+        use_mean=False,
+        expl_scale=1.0,
+        reward_scale=1.0,
+        strategy="information",
+        device="cpu",
+    ):
+        super().__init__()
+        self.ensemble = ensemble
+        self.reward_model = reward_model
+        self.action_size = action_size
+        self.ensemble_size = ensemble_size
+
+        self.plan_horizon = plan_horizon
+        self.optimisation_iters = optimisation_iters
+        self.n_candidates = n_candidates
+        self.top_candidates = top_candidates
+
+        self.use_reward = use_reward
+        self.use_exploration = use_exploration
+        self.use_mean = use_mean
+        self.expl_scale = expl_scale
+        self.reward_scale = reward_scale
+        self.device = device
+
+        # Set the exploration strategy
+        if strategy == "information":
+            self.measure = InformationGain(self.ensemble, scale=expl_scale)
+        elif strategy == "variance":
+            self.measure = Variance(self.ensemble, scale=expl_scale)
+        elif strategy == "random":
+            self.measure = Random(self.ensemble, scale=expl_scale)
+        elif strategy == "none":
+            self.use_exploration = False
+
+        # Initialize storage for trial rewards and bonuses
+        self.trial_rewards = []
+        self.trial_bonuses = []
+        self.to(device)
+
+    def forward(self, state):
+        # Convert the state to a tensor and move to the appropriate device
+        state = torch.from_numpy(state).float().to(self.device)
+        state_size = state.size(0)
+
+        # Initialize the mean and standard deviation of the action sequences
+        action_mean = torch.zeros(self.plan_horizon, 1, self.action_size).to(self.device)
+        action_std_dev = torch.ones(self.plan_horizon, 1, self.action_size).to(self.device)
+
+        # Optimization loop to refine action sequences
+        for _ in range(self.optimisation_iters):
+            # Sample actions from the current Gaussian distribution
+            actions = action_mean + action_std_dev * torch.randn(
+                self.plan_horizon,
+                self.n_candidates,
+                self.action_size,
+                device=self.device,
+            )
+
+            # Simulate the outcomes of the action sequences
+            states, delta_vars, delta_means = self.perform_rollout(state, actions)
+
+            # Initialize the returns (rewards + exploration bonuses)
+            returns = torch.zeros(self.n_candidates).float().to(self.device)
+
+            # Calculate exploration bonuses if applicable
+            if self.use_exploration:
+                expl_bonus = self.measure(delta_means, delta_vars) * self.expl_scale
+                returns += expl_bonus
+                self.trial_bonuses.append(expl_bonus)
+
+            # Calculate rewards if applicable
+            if self.use_reward:
+                _states = states.view(-1, state_size)
+                _actions = actions.unsqueeze(0).repeat(self.ensemble_size, 1, 1, 1)
+                _actions = _actions.view(-1, self.action_size)
+                rewards = self.reward_model(_states, _actions)
+                rewards = rewards * self.reward_scale
+                rewards = rewards.view(
+                    self.plan_horizon, self.ensemble_size, self.n_candidates
+                )
+                rewards = rewards.mean(dim=1).sum(dim=0)
+                returns += rewards
+                self.trial_rewards.append(rewards)
+
+            # Refine the action distribution based on returns
+            action_mean, action_std_dev = self._fit_gaussian(actions, returns)
+
+        # Return the first action in the refined sequence
+        return action_mean[0].squeeze(dim=0)
+
+    def perform_rollout(self, current_state, actions):
+        T = self.plan_horizon + 1
+
+        # Initialize lists to store states, delta means, and delta variances
+        states = [torch.empty(0)] * T
+        delta_means = [torch.empty(0)] * T
+        delta_vars = [torch.empty(0)] * T
+
+        # Prepare the initial state tensor
+        current_state = current_state.unsqueeze(dim=0).unsqueeze(dim=0)
+        current_state = current_state.repeat(self.ensemble_size, self.n_candidates, 1)
+        states[0] = current_state
+
+        # Prepare the actions tensor for the ensemble
+        actions = actions.unsqueeze(0)
+        actions = actions.repeat(self.ensemble_size, 1, 1, 1).permute(1, 0, 2, 3)
+
+        # Simulate each time step in the planning horizon
+        for t in range(self.plan_horizon):
+            delta_mean, delta_var = self.ensemble(states[t], actions[t])
+            if self.use_mean:
+                states[t + 1] = states[t] + delta_mean
+            else:
+                states[t + 1] = states[t] + self.ensemble.sample(delta_mean, delta_var)
+            delta_means[t + 1] = delta_mean
+            delta_vars[t + 1] = delta_var
+
+        # Stack and return the final states, delta means, and delta variances
+        states = torch.stack(states[1:], dim=0)
+        delta_vars = torch.stack(delta_vars[1:], dim=0)
+        delta_means = torch.stack(delta_means[1:], dim=0)
+        return states, delta_vars, delta_means
+
+    def _fit_gaussian(self, actions, returns):
+        # Replace NaN values in returns with zeros
+        returns = torch.where(torch.isnan(returns), torch.zeros_like(returns), returns)
+
+        # Select the top-performing actions based on returns
+        _, topk = returns.topk(self.top_candidates, dim=0, largest=True, sorted=False)
+        best_actions = actions[:, topk.view(-1)].reshape(
+            self.plan_horizon, self.top_candidates, self.action_size
+        )
+
+        # Calculate the mean and standard deviation of the best actions
+        action_mean, action_std_dev = (
+            best_actions.mean(dim=1, keepdim=True),
+            best_actions.std(dim=1, unbiased=False, keepdim=True),
+        )
+
+        # Return the refined mean and standard deviation for the action distribution
+        return action_mean, action_std_dev
+
+    def return_stats(self):
+        if self.use_reward:
+            reward_stats = self._create_stats(self.trial_rewards)
+        else:
+            reward_stats = {}
+        if self.use_exploration:
+            info_stats = self._create_stats(self.trial_bonuses)
+        else:
+            info_stats = {}
+        self.trial_rewards = []
+        self.trial_bonuses = []
+        return reward_stats, info_stats
+
+    def _create_stats(self, arr):
+        tensor = torch.stack(arr)
+        tensor = tensor.view(-1)
+        return {
+            "max": tensor.max().item(),
+            "min": tensor.min().item(),
+            "mean": tensor.mean().item(),
+            "std": tensor.std().item(),
+        }
+
+
+# End file: pmbrl/control/planner.py
+
+==============================
+
+==============================
+# Begin file: pmbrl/control/high_level_planner.py
+import torch
+import torch.nn as nn
+
+from pmbrl.control.measures import InformationGain, Disagreement, Variance, Random
+
+class HighLevelPlanner(nn.Module):
+    #TODO: Verify measures for high-level planner
+    def __init__(
+        self,
+        env,
+        ensemble,
+        reward_model,
+        goal_size,
+        ensemble_size,
+        plan_horizon,
+        optimisation_iters,
+        n_candidates,
+        top_candidates,
+        use_exploration=True,
+        use_reward=True,
+        reward_scale=1.0,
+        expl_scale=1.0,
+        strategy="information",
+        device="cpu",
+    ):
+        super().__init__()
+        self.env = env
+        self.ensemble = ensemble
+        self.reward_model = reward_model
+        self.goal_size = goal_size
+        self.ensemble_size = ensemble_size
+        self.plan_horizon = plan_horizon
+        self.optimisation_iters = optimisation_iters
+        self.n_candidates = n_candidates
+        self.top_candidates = top_candidates
+        self.use_reward = use_reward
+        self.use_exploration = use_exploration
+        self.reward_scale = reward_scale
+        self.expl_scale = expl_scale
+        self.device = device
+
+        # Set the exploration strategy for the high-level goals
+        if strategy == "information":
+            self.measure = InformationGain(self.ensemble, scale=expl_scale)
+        elif strategy == "variance":
+            self.measure = Variance(self.ensemble, scale=expl_scale)
+        elif strategy == "random":
+            self.measure = Random(self.ensemble, scale=expl_scale)
+        elif strategy == "none":
+            self.use_exploration = False
+
+        # Initialize storage for trial rewards and bonuses
+        self.trial_rewards = []
+        self.trial_bonuses = []
+        self.to(device)
+
+    def forward(self, state):
+        state = torch.from_numpy(state).float().to(self.device)
+        state_size = state.size(0)
+
+        # Generate high-level goal as context
+        goal_mean = torch.zeros(self.plan_horizon, 1, self.goal_size).to(self.device)
+        goal_std_dev = torch.ones(self.plan_horizon, 1, self.goal_size).to(self.device)
+
+        for _ in range(self.optimisation_iters):
+            goals = goal_mean + goal_std_dev * torch.randn(
+                self.plan_horizon, self.n_candidates, self.goal_size, device=self.device)
+            
+            # Convert numpy arrays to tensors
+            min_bounds = torch.tensor(self.env.observation_space.low, device=goals.device)
+            max_bounds = torch.tensor(self.env.observation_space.high, device=goals.device)
+
+            # Ensure the sampled goals are within the environment's state bounds
+            goals = torch.clamp(goals, min=min_bounds, max=max_bounds)
+
+            states, delta_vars, delta_means = self.perform_rollout(state, goals)
+
+            returns = torch.zeros(self.n_candidates).float().to(self.device)
+
+            if self.use_exploration:
+                expl_bonus = self.measure(delta_means, delta_vars) * self.expl_scale
+                returns += expl_bonus
+                self.trial_bonuses.append(expl_bonus)
+
+            # Implement goal-based reward model
+            if self.use_reward:
+                _states = states.view(-1, state_size)
+                _goals = goals.unsqueeze(0).repeat(self.ensemble_size, 1, 1, 1)
+                _goals = _goals.view(-1, self.goal_size)
+                rewards = self.reward_model(_states, _goals)
+                rewards = rewards * self.reward_scale
+                rewards = rewards.view(self.plan_horizon, self.ensemble_size, self.n_candidates)
+                rewards = rewards.mean(dim=1).sum(dim=0)
+                returns += rewards
+                self.trial_rewards.append(rewards)
+
+            goal_mean, goal_std_dev = self._fit_gaussian(goals, returns)
+
+        # Return the high-level goal (context)
+        return goal_mean[0].squeeze(dim=0)
+
+
+    def perform_rollout(self, current_state, goals):
+        T = self.plan_horizon + 1
+
+        # Initialize lists to store states, delta means, and delta variances
+        states = [torch.empty(0)] * T
+        delta_means = [torch.empty(0)] * T
+        delta_vars = [torch.empty(0)] * T
+
+        # Prepare the initial state tensor
+        current_state = current_state.unsqueeze(dim=0).unsqueeze(dim=0)
+        current_state = current_state.repeat(self.ensemble_size, self.n_candidates, 1)
+        states[0] = current_state
+
+        # Prepare the goals tensor for the ensemble
+        goals = goals.unsqueeze(0)
+        goals = goals.repeat(self.ensemble_size, 1, 1, 1).permute(1, 0, 2, 3)
+
+        # Simulate each time step in the planning horizon
+        for t in range(self.plan_horizon):
+            delta_mean, delta_var = self.ensemble(states[t], goals[t])
+            # Update states towards achieving the goals
+            states[t + 1] = states[t] + delta_mean
+            delta_means[t + 1] = delta_mean
+            delta_vars[t + 1] = delta_var
+
+        # Stack and return the final states, delta means, and delta variances
+        states = torch.stack(states[1:], dim=0)
+        delta_vars = torch.stack(delta_vars[1:], dim=0)
+        delta_means = torch.stack(delta_means[1:], dim=0)
+        return states, delta_vars, delta_means
+
+    def _fit_gaussian(self, goals, returns):
+        # Replace NaN values in returns with zeros
+        returns = torch.where(torch.isnan(returns), torch.zeros_like(returns), returns)
+
+        # Select the top-performing goals based on returns
+        _, topk = returns.topk(self.top_candidates, dim=0, largest=True, sorted=False)
+        best_goals = goals[:, topk.view(-1)].reshape(
+            self.plan_horizon, self.top_candidates, self.goal_size
+        )
+
+        # Calculate the mean and standard deviation of the best goals
+        goal_mean, goal_std_dev = (
+            best_goals.mean(dim=1, keepdim=True),
+            best_goals.std(dim=1, unbiased=False, keepdim=True),
+        )
+
+        # Return the refined mean and standard deviation for the goal distribution
+        return goal_mean, goal_std_dev
+
+    def return_stats(self):
+        if self.use_reward:
+            reward_stats = self._create_stats(self.trial_rewards)
+        else:
+            reward_stats = {}
+        if self.use_exploration:
+            info_stats = self._create_stats(self.trial_bonuses)
+        else:
+            info_stats = {}
+        self.trial_rewards = []
+        self.trial_bonuses = []
+        return reward_stats, info_stats
+
+    def _create_stats(self, arr):
+        tensor = torch.stack(arr)
+        tensor = tensor.view(-1)
+        return {
+            "max": tensor.max().item(),
+            "min": tensor.min().item(),
+            "mean": tensor.mean().item(),
+            "std": tensor.std().item(),
+        }
+
+# End file: pmbrl/control/high_level_planner.py
+
+==============================
+
+==============================
+# Begin file: pmbrl/control/low_level_planner.py
+import torch
+import torch.nn as nn
+
+from pmbrl.control.planner import Planner
+
+class LowLevelPlanner(nn.Module):
+    #TODO: Verify measures for low-level planner
+    """
+    Low-level planner responsible for generating actions that bring the agent
+    closer to achieving the high-level goal provided by the HighLevelPlanner.
+    """
+
+    def __init__(self, env, ensemble, action_model, ensemble_size, plan_horizon, action_noise_scale, device="cpu"):
+        super().__init__()
+        self.env = env
+        self.ensemble = ensemble
+        self.action_model = action_model
+        self.ensemble_size = ensemble_size
+        self.plan_horizon = plan_horizon
+        self.action_noise_scale = action_noise_scale
+        self.device = device
+
+    def forward(self, state, goal):
+        """
+        Generate actions based on the current state and goal.
+
+        Args:
+            state (torch.Tensor): The current state of the environment.
+            goal (torch.Tensor): The desired goal state.
+
+        Returns:
+            action (torch.Tensor): The generated action.
+            reward (torch.Tensor): The negative distance between the predicted next state and the goal.
+        """
+
+        if not isinstance(state, torch.Tensor):
+            state = torch.tensor(state, dtype=torch.float32, device=self.device)
+        if not isinstance(goal, torch.Tensor):
+            goal = torch.tensor(goal, dtype=torch.float32, device=self.device)
+        # Reshape the state and goal tensors for the ensemble model
+        state = state.unsqueeze(dim=0).unsqueeze(dim=0).repeat(self.ensemble_size, 1, 1)
+        goal = goal.unsqueeze(0).repeat(self.ensemble_size, 1, 1)
+
+        # Predict an action given the current state and goal
+        action = self.action_model(state, goal)
+
+        # Convert the numpy arrays to tensors
+        min_action = torch.tensor(self.env.action_space.low, dtype=torch.float32, device=action.device)
+        max_action = torch.tensor(self.env.action_space.high, dtype=torch.float32, device=action.device)
+
+        # Clamp the action tensor
+        action = torch.clamp(action, min=min_action, max=max_action)
+
+        # Predict the next state using the ensemble model
+        predicted_next_state, _ = self.ensemble(state, action)
+
+        # Calculate the reward as the negative distance to the goal
+        reward = -torch.norm(predicted_next_state - goal, p=2, dim=-1).mean()
+
+        return action, reward
+
+    def perform_rollout(self, current_state, goal):
+        """
+        Perform a rollout simulation to evaluate the actions against the goal.
+
+        Args:
+            current_state (torch.Tensor): The current state tensor.
+            goal (torch.Tensor): The goal to achieve.
+
+        Returns:
+            Tuple of torch.Tensor: The states, delta means, and delta variances.
+        """
+        T = self.plan_horizon + 1
+
+        # Initialize lists to store states, delta means, and delta variances
+        states = [torch.empty(0)] * T
+        delta_means = [torch.empty(0)] * T
+        delta_vars = [torch.empty(0)] * T
+
+        # Prepare the initial state tensor
+        current_state = current_state.unsqueeze(dim=0).unsqueeze(dim=0)
+        current_state = current_state.repeat(self.ensemble_size, 1, 1)
+        states[0] = current_state
+
+        # Simulate each time step in the planning horizon
+        for t in range(self.plan_horizon):
+            action = self.action_model(states[t], goal)
+            predicted_next_state, delta_var = self.ensemble(states[t], action)
+            delta_means[t + 1] = predicted_next_state - states[t]
+            delta_vars[t + 1] = delta_var
+            states[t + 1] = predicted_next_state
+
+        # Stack and return the final states, delta means, and delta variances
+        states = torch.stack(states[1:], dim=0)
+        delta_vars = torch.stack(delta_vars[1:], dim=0)
+        delta_means = torch.stack(delta_means[1:], dim=0)
+        return states, delta_vars, delta_means
+
+# End file: pmbrl/control/low_level_planner.py
+
+==============================
+
+==============================
+# Begin file: pmbrl/control/measures.py
+# pylint: disable=not-callable
+# pylint: disable=no-member
+
+import torch
+import numpy as np
+from scipy.special import psi, gamma
+
+
+class Random(object):
+    def __init__(self, model, scale=1.0):
+        self.model = model
+        self.scale = scale
+
+    def __call__(self, delta_means, delta_vars):
+        """
+        delta_means   (plan_horizon, ensemble_size, n_candidates, n_dim)
+        delta_vars    (plan_horizon, ensemble_size, n_candidates, n_dim)
+        """
+
+        n_candidates = delta_means.size(2)
+        randoms = torch.randn(n_candidates).float().to(delta_means.device)
+
+        return randoms
+
+
+class Variance(object):
+    def __init__(self, model, scale=1.0):
+        self.model = model
+        self.scale = scale
+
+    def __call__(self, delta_means, delta_vars):
+        """
+        delta_means   (plan_horizon, ensemble_size, n_candidates, n_dim)
+        delta_vars    (plan_horizon, ensemble_size, n_candidates, n_dim)
+        """
+        plan_horizon = delta_means.size(0)
+        n_candidates = delta_means.size(2)
+        delta_means = self.model.normalizer.renormalize_state_delta_means(delta_means)
+        variance = (
+            torch.zeros(plan_horizon, n_candidates).float().to(delta_means.device)
+        )
+        for t in range(plan_horizon):
+            variance[t, :] = self.get_variance(delta_vars[t])
+
+        variance = variance * self.scale
+        return variance.sum(dim=0)
+
+    def get_variance(self, delta_vars):
+        """ ensemble_size, candidates, n_dim """
+        variance = delta_vars.sum(dim=0).sum(dim=-1)
+        return variance
+
+
+class Disagreement(object):
+    def __init__(self, model, scale=1.0):
+        self.model = model
+        self.scale = scale
+
+    def __call__(self, delta_means, delta_vars):
+        """
+        delta_means   (plan_horizon, ensemble_size, n_candidates, n_dim)
+        delta_vars    (plan_horizon, ensemble_size, n_candidates, n_dim)
+        """
+        plan_horizon = delta_means.size(0)
+        n_candidates = delta_means.size(2)
+        delta_means = self.model.normalizer.renormalize_state_delta_means(delta_means)
+        disagreements = (
+            torch.zeros(plan_horizon, n_candidates).float().to(delta_means.device)
+        )
+        for t in range(plan_horizon):
+            disagreements[t, :] = self.get_disagreement(delta_means[t])
+
+        disagreements = disagreements * self.scale
+        return disagreements.sum(dim=0)
+
+    def get_disagreement(self, delta_means):
+        """ ensemble_size, candidates, n_dim """
+        disagreement = delta_means.std(dim=0).sum(dim=-1)
+        return disagreement
+
+
+class InformationGain(object):
+    def __init__(self, model, scale=1.0):
+        self.model = model
+        self.scale = scale
+
+    def __call__(self, delta_means, delta_vars):
+        """
+        delta_means   (plan_horizon, ensemble_size, n_candidates, n_dim)
+        delta_vars    (plan_horizon, ensemble_size, n_candidates, n_dim)
+        """
+
+        plan_horizon = delta_means.size(0)
+        n_candidates = delta_means.size(2)
+
+        delta_means = self.model.normalizer.renormalize_state_delta_means(delta_means)
+        delta_vars = self.model.normalizer.renormalize_state_delta_vars(delta_vars)
+        delta_states = self.model.sample(delta_means, delta_vars)
+        info_gains = (
+            torch.zeros(plan_horizon, n_candidates).float().to(delta_means.device)
+        )
+
+        for t in range(plan_horizon):
+            ent_avg = self.entropy_of_average(delta_states[t])
+            avg_ent = self.average_of_entropy(delta_vars[t])
+            info_gains[t, :] = ent_avg - avg_ent
+
+        info_gains = info_gains * self.scale
+        return info_gains.sum(dim=0)
+
+    def entropy_of_average(self, samples):
+        """
+        samples (ensemble_size, n_candidates, n_dim) 
+        """
+        samples = samples.permute(1, 0, 2)
+        n_samples = samples.size(1)
+        dims = samples.size(2)
+        k = 3
+
+        distances_yy = self.batched_cdist_l2(samples, samples)
+        y, _ = torch.sort(distances_yy, dim=1)
+        v = self.volume_of_the_unit_ball(dims)
+        h = (
+            np.log(n_samples - 1)
+            - psi(k)
+            + np.log(v)
+            + dims * torch.sum(torch.log(y[:, k - 1]), dim=1) / n_samples
+            + 0.5
+        )
+        return h
+
+    def batched_cdist_l2(self, x1, x2):
+        x1_norm = x1.pow(2).sum(dim=-1, keepdim=True)
+        x2_norm = x2.pow(2).sum(dim=-1, keepdim=True)
+        res = (
+            torch.baddbmm(x2_norm.transpose(-2, -1), x1, x2.transpose(-2, -1), alpha=-2)
+            .add_(x1_norm)
+            .clamp_min_(1e-30)
+            .sqrt_()
+        )
+        return res
+
+    def volume_of_the_unit_ball(self, dim):
+        return np.pi ** (dim / 2) / gamma(dim / 2 + 1)
+
+    def average_of_entropy(self, delta_vars):
+        return torch.mean(self.gaussian_diagonal_entropy(delta_vars), dim=0)
+
+    def gaussian_diagonal_entropy(self, delta_vars):
+        min_variance = 1e-8
+        return 0.5 * torch.sum(
+            torch.log(2 * np.pi * np.e * torch.clamp(delta_vars, min=min_variance)),
+            dim=len(delta_vars.size()) - 1,
+        )
+# End file: pmbrl/control/measures.py
+
+==============================
+
+==============================
+# Begin file: pmbrl/control/agent.py
+from copy import deepcopy
+import numpy as np
+import torch
+import torch.nn as nn
+
+# TODO: Ensure we're only using torch tensors and not numpy arrays
+class HierarchicalAgent(object):
+    """
+    Hierarchical agent that manages the interaction between the high-level and low-level planners.
+    The agent controls the flow of information and decisions during an episode.
+    """
+
+    def __init__(self, env, high_level_planner, low_level_planner, context_length=1, logger=None, exploration_measure=None, device="cpu"):
+        """
+        Initialize the HierarchicalAgent.
+
+        Args:
+            env (gym.Env): The environment in which the agent operates.
+            high_level_planner (HighLevelPlanner): The high-level planner.
+            low_level_planner (LowLevelPlanner): The low-level planner.
+            context_length (int, optional): The number of steps a goal is active before resampling.
+            logger (Logger, optional): Logger for recording training information.
+            exploration_measure (object, optional): The exploration measure to use (Variance, Disagreement, InformationGain).
+        """
+        self.env = env
+        self.high_level_planner = high_level_planner
+        self.low_level_planner = low_level_planner
+        self.context_length = context_length
+        self.logger = logger
+        self.current_goal = None
+        self.next_goal = None
+        self.device = device
+
+    def get_seed_episodes(self, buffer, n_episodes):
+        """
+        Collect seed episodes by interacting with the environment using random actions.
+
+        Args:
+            buffer (Buffer): The buffer to store experiences.
+            n_episodes (int): Number of episodes to collect.
+
+        Returns:
+            Buffer: The buffer filled with seed episodes.
+        """
+        for episode in range(n_episodes):
+            state = self.env.reset()
+            done = False
+            step = 0
+            transitions = []
+
+            while not done:
+                action = self.env.sample_action()
+                next_state, reward, done, _ = self.env.step(action)
+
+                # Store transitions temporarily
+                transitions.append((deepcopy(state), action, reward, deepcopy(next_state)))
+
+                # After every context_length steps, retroactively compute the goals and store in buffer
+                if step % self.context_length == 0 or done:
+                    if step > 0:
+                        buffer.update()
+
+                    if len(transitions) == self.context_length:
+                        final_goal = deepcopy(next_state)
+                        
+                        goals = [final_goal]
+                        for i in range(self.context_length - 1, 0, -1):
+                            prev_goal = goals[-1] + transitions[i][0] - transitions[i-1][0]
+                            goals.append(prev_goal)
+                        goals.reverse()
+
+                        # Add the transitions and goals to the buffer
+                        for i in range(self.context_length):
+                            state, action, reward, next_state = transitions[i]
+                            next_goal = goals[i]
+                            buffer.add(state, goals[i], action, reward, next_state, next_goal)
+                            if self.logger:
+                                self.logger.log(f"Low-level transition added: state={state}, goal={goals[i]}, action={action}, reward={reward}, next_state={next_state}, next_goal={next_goal}")
+
+                    transitions = []  # Clear transitions for the next context
+
+                state = deepcopy(next_state)
+                step += 1
+
+            if self.logger:
+                self.logger.log(f"Episode {episode+1}/{n_episodes} complete.")
+
+        return buffer
+
+    def run_episode(self, buffer=None, action_noise=None, recorder=None):
+        """
+        Run a single episode in the environment, using the hierarchical planners.
+
+        Args:
+            buffer (Buffer, optional): The buffer to store experiences.
+            action_noise (float, optional): Noise added to the actions for exploration.
+            recorder (VideoRecorder, optional): Recorder for capturing video of the episode.
+
+        Returns:
+            Tuple: Total reward, total steps, and statistics from the episode.
+        """
+        total_reward = 0
+        total_steps = 0
+        done = False
+        step = 0
+
+        with torch.no_grad():
+            state = self.env.reset()
+
+            while not done:
+                if step % self.context_length == 0:
+                    self.current_goal = self.high_level_planner(state)
+                    self.logger.log("New context")
+                    if self.logger:
+                        self.logger.log(f"New high-level goal sampled at step {step}: {self.current_goal}")
+
+                    if step > 0:
+                        corrected_goal = self.off_policy_goal_correction(buffer, state, exploration_scale=self.high_level_planner.expl_scale)
+                        buffer.update(corrected_goal)
+                        if self.logger:
+                            self.logger.log(f"High-level transition updated with corrected goal: {corrected_goal}")
+
+                action, low_level_reward = self.low_level_planner(state, self.current_goal)
+                if action_noise is not None:
+                    action = self._add_action_noise(action, action_noise)
+                action = action.cpu().detach().numpy()
+
+                next_state, reward, done, _ = self.env.step(action)
+
+                # if not isinstance(self.current_goal, torch.Tensor):
+                #     self.current_goal = torch.from_numpy(self.current_goal).float().to(self.device)
+                if not isinstance(state, torch.Tensor):
+                    state = torch.from_numpy(state).float().to(self.device)
+
+                self.next_goal = state + self.current_goal - next_state
+                total_reward += reward
+                total_steps += 1
+
+                if self.logger:
+                    self.logger.log(f"Step {step}: state={state}, goal={self.current_goal}, action={action}, reward={reward}, next_state={next_state}, next_goal={self.next_goal}")
+
+                if self.logger and total_steps % 25 == 0:
+                    self.logger.log(f"Progress log - Total steps: {total_steps}, Total reward: {total_reward}")
+
+                if buffer is not None:
+                    # self.logger.log(f"Action: {action}")
+                    buffer.add(deepcopy(state), deepcopy(self.current_goal), action[0], reward + low_level_reward, deepcopy(next_state), deepcopy(self.next_goal))
+                    # if self.logger:
+                    #     self.logger.log(f"Low-level transition added: state={state}, goal={self.current_goal}, action={action}, reward={reward + low_level_reward}, next_state={next_state}, next_goal={self.next_goal}")
+
+                if recorder is not None:
+                    recorder.capture_frame()
+
+                state = deepcopy(next_state)
+                self.current_goal = deepcopy(self.next_goal)
+                step += 1
+
+                if done:
+                    break
+
+            if recorder is not None:
+                recorder.close()
+                del recorder
+
+            self.env.close()
+            stats = self.high_level_planner.return_stats()
+            if self.logger:
+                self.logger.log(f"Episode complete. Total reward: {total_reward}, Total steps: {total_steps}")
+            return total_reward, total_steps, stats
+
+    def _add_action_noise(self, action, noise):
+        """
+        Add noise to the actions for exploration.
+
+        Args:
+            action (torch.Tensor): The original action tensor.
+            noise (float): The noise scale.
+
+        Returns:
+            torch.Tensor: The action tensor with added noise.
+        """
+        if noise is not None:
+            action = action + noise * torch.randn_like(action)
+        return action
+    
+    def off_policy_goal_correction(self, buffer, state, use_exploration=True, exploration_scale=1.0):
+        """
+        Implements off-policy goal correction with an optional exploration objective.
+
+        Args:
+            buffer (Buffer): The buffer containing the high-level transitions.
+            state (torch.Tensor): The current state.
+            use_exploration (bool): Whether to include an exploration objective (information gain).
+            exploration_scale (float): Weight for the exploration term in the combined objective.
+
+        Returns:
+            torch.Tensor: The corrected goal that maximizes the combined objective.
+        """
+        state = torch.from_numpy(state).float().to(self.device)
+        candidate_goals = []
+
+        candidate_goals.append(self.current_goal)
+        candidate_goals.append(buffer.high_level_next_states[-1] - buffer.high_level_states[-1])
+
+        mean = buffer.high_level_next_states[-1] - buffer.high_level_states[-1]
+        std_dev = 0.5 * torch.std(self.current_goal).item() * torch.ones_like(mean)
+        for _ in range(8):
+            sampled_goal = torch.normal(mean, std_dev).to(self.device)
+            candidate_goals.append(sampled_goal)
+
+        candidate_goals = [torch.clamp(goal, min=self.env.observation_space.low, max=self.env.observation_space.high) for goal in candidate_goals]
+
+        best_goal = None
+        best_objective = float('-inf')
+        for candidate_goal in candidate_goals:
+            log_prob = 0
+            for i in range(len(buffer.low_level_actions)):
+                action = buffer.low_level_actions[i]
+                predicted_action = self.low_level_planner(buffer.low_level_states[i], candidate_goal)
+                log_prob += -0.5 * torch.norm(action - predicted_action[0], p=2).item() ** 2
+
+            if use_exploration and self.exploration_measure is not None:
+                delta_means, delta_vars = self.high_level_planner.perform_rollout(state, candidate_goal.unsqueeze(0))
+                exploration_bonus = self.high_level_planner.measure(delta_means, delta_vars).sum().item()
+            else:
+                exploration_bonus = 0
+
+            objective = log_prob + exploration_scale * exploration_bonus
+
+            if objective > best_objective:
+                best_objective = objective
+                best_goal = candidate_goal
+
+        if self.logger:
+            self.logger.log(f"Off-policy goal correction: Selected goal={best_goal} with objective={best_objective}")
+
+        return best_goal
+
+
+
+
+# End file: pmbrl/control/agent.py
+
+==============================
+
+==============================
+# Begin file: scripts/train.py
+# pylint: disable=not-callable
+# pylint: disable=no-member
+
+import sys
+import time
+import pathlib
+import argparse
+
+import numpy as np
+import torch
+from gym.wrappers.monitoring.video_recorder import VideoRecorder
+
+sys.path.append(str(pathlib.Path(__file__).parent.parent))
+
+from pmbrl.envs import GymEnv
+from pmbrl.training import Normalizer, Buffer, HierarchicalTrainer
+from pmbrl.models import EnsembleModel, RewardModel, ActionModel
+from pmbrl.control import HighLevelPlanner, LowLevelPlanner, HierarchicalAgent
+from pmbrl.utils import Logger
+from pmbrl import get_config
+
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+# TODO: Ensure we're only using torch tensors and not numpy arrays throughout the codebase
+
+
+def main(args):
+    logger = Logger(args.logdir, args.seed)
+    logger.log("\n=== Loading experiment [device: {}] ===\n".format(DEVICE))
+    logger.log(args)
+
+    rate_buffer = None
+    if args.coverage:
+        from pmbrl.envs.envs.ant import rate_buffer
+
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(args.seed)
+
+    env = GymEnv(
+        args.env_name, args.max_episode_len, action_repeat=args.action_repeat, seed=args.seed
+    )
+    action_size = env.action_space.shape[0]
+    state_size = env.observation_space.shape[0]
+    goal_size = state_size
+
+    normalizer = Normalizer()
+    print(f'context_length: {args.context_length}')
+    buffer = Buffer(state_size, action_size, goal_size, args.ensemble_size, normalizer, args.context_length,  device=DEVICE)
+
+    ensemble = EnsembleModel(
+        state_size + goal_size,
+        state_size,
+        args.hidden_size,
+        args.ensemble_size,
+        normalizer,
+        device=DEVICE,
+    )
+    reward_model = RewardModel(state_size + goal_size, args.hidden_size, device=DEVICE)
+    action_model = ActionModel(state_size, goal_size, action_size, args.hidden_size, device=DEVICE)
+
+    high_level_planner = HighLevelPlanner(
+        env=env,
+        ensemble=ensemble,
+        reward_model=reward_model,
+        goal_size=goal_size,
+        ensemble_size=args.ensemble_size,
+        plan_horizon=args.plan_horizon,
+        optimisation_iters=args.optimisation_iters,
+        n_candidates=args.n_candidates,
+        top_candidates=args.top_candidates,
+        use_reward=args.use_reward,
+        reward_scale=args.reward_scale,
+        use_exploration=args.use_exploration,
+        expl_scale=args.expl_scale,
+        strategy=args.strategy,
+        device=DEVICE,
+    )
+
+    low_level_planner = LowLevelPlanner(
+        env=env,
+        ensemble=ensemble,
+        action_model=action_model,
+        ensemble_size=args.ensemble_size,
+        plan_horizon=args.context_length,
+        action_noise_scale=args.action_noise_scale,
+        device=DEVICE,
+    )
+
+    # low_level_planner = LowLevelPlanner(
+    #     ensemble=ensemble,
+    #     reward_model=reward_model,
+    #     action_size=action_size,
+    #     ensemble_size=args.ensemble_size,
+    #     plan_horizon=args.context_length,
+    #     optimisation_iters=args.optimisation_iters,
+    #     n_candidates=args.n_candidates,
+    #     top_candidates=args.top_candidates,
+    #     use_reward=args.use_reward,
+    #     use_exploration=args.use_exploration,
+    #     use_mean=args.use_mean,
+    #     expl_scale=args.expl_scale,
+    #     reward_scale=args.reward_scale,
+    #     strategy=args.strategy,
+    #     device=DEVICE,
+    # )
+
+    # planner = Planner(
+    #     ensemble,
+    #     reward_model,
+    #     action_size,
+    #     args.ensemble_size,
+    #     plan_horizon=args.plan_horizon,
+    #     optimisation_iters=args.optimisation_iters,
+    #     n_candidates=args.n_candidates,
+    #     top_candidates=args.top_candidates,
+    #     use_reward=args.use_reward,
+    #     use_exploration=args.use_exploration,
+    #     use_mean=args.use_mean,
+    #     expl_scale=args.expl_scale,
+    #     reward_scale=args.reward_scale,
+    #     strategy=args.strategy,
+    #     device=DEVICE,
+    # )
+    agent = HierarchicalAgent(env, high_level_planner, low_level_planner, logger=logger)
+
+    trainer = HierarchicalTrainer(
+        high_level_ensemble_model=ensemble,
+        high_level_reward_model=reward_model,
+        low_level_action_model=action_model,
+        buffer=buffer,
+        n_train_epochs=args.n_train_epochs,
+        batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
+        epsilon=args.epsilon,
+        grad_clip_norm=args.grad_clip_norm,
+        logger=logger,
+        device=DEVICE,
+    )
+
+    agent.get_seed_episodes(buffer, args.n_seed_episodes)
+    msg = "\nCollected seeds: [{} episodes | {} frames]"
+    logger.log(msg.format(args.n_seed_episodes, buffer.total_steps))
+
+    for episode in range(1, args.n_episodes):
+        logger.log("\n=== Episode {} ===".format(episode))
+        start_time = time.time()
+
+        msg = "Training on [{}/{}] data points"
+        logger.log(msg.format(buffer.total_steps, buffer.total_steps * args.action_repeat))
+        trainer.reset_models()
+        h_ensemble_loss, h_reward_loss, l_action_loss = trainer.train()
+        logger.log_losses(h_ensemble_loss, h_reward_loss, l_action_loss)
+
+        recorder = None
+        if args.record_every is not None and args.record_every % episode == 0:
+            filename = logger.get_video_path(episode)
+            recorder = VideoRecorder(env.unwrapped, path=filename)
+            logger.log("Setup recoder @ {}".format(filename))
+
+        logger.log("\n=== Collecting data [{}] ===".format(episode))
+        reward, steps, stats = agent.run_episode(
+            buffer, action_noise=args.action_noise, recorder=recorder
+        )
+        logger.log_episode(reward, steps)
+        logger.log_stats(stats)
+
+        if args.coverage:
+            coverage = rate_buffer(buffer=buffer)
+            logger.log_coverage(coverage)
+
+        logger.log_time(time.time() - start_time)
+        logger.save()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--logdir", type=str, default="log")
+    parser.add_argument("--config_name", type=str, default="mountain_car")
+    parser.add_argument("--strategy", type=str, default="information")
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--context_length", type=int, default=7)
+    args = parser.parse_args()
+    config = get_config(args)
+    main(config)
+# End file: scripts/train.py
+
+==============================

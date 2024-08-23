@@ -42,6 +42,7 @@ class HierarchicalAgent(object):
         Returns:
             Buffer: The buffer filled with seed episodes.
         """
+        print(f"Collecting {n_episodes} seed episodes.")
         for episode in range(n_episodes):
             state = self.env.reset()
             done = False
@@ -82,9 +83,14 @@ class HierarchicalAgent(object):
                 state = deepcopy(next_state)
                 step += 1
 
+                if done:
+                    break
+
             if self.logger:
                 self.logger.log(f"Episode {episode+1}/{n_episodes} complete.")
-
+        print (f"Buffer size: {len(buffer)}")
+        print(f'Step count: {buffer._total_steps}')
+        print(f"High-level goals: {len(buffer.high_level_goals)}")
         return buffer
 
     def run_episode(self, buffer=None, action_noise=None, recorder=None):

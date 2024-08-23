@@ -174,8 +174,9 @@ class HierarchicalTrainer(object):
 
         self.high_level_optim = torch.optim.Adam(self.high_level_params, lr=self.learning_rate, eps=self.epsilon)
         self.low_level_optim = torch.optim.Adam(self.low_level_params, lr=self.learning_rate, eps=self.epsilon)
-
-    def _get_avg_loss(self, losses, n_batches, epoch):
+    
+    @staticmethod
+    def _get_avg_loss(losses, n_batches, epoch):
         """
         Computes the average loss over all batches for the given epoch.
 
@@ -187,5 +188,4 @@ class HierarchicalTrainer(object):
         Returns:
             float: Average loss for the epoch.
         """
-        epoch_loss = [sum(loss) / n_batch for loss, n_batch in zip(losses, n_batches)]
-        return sum(epoch_loss) / epoch
+        return sum(losses[epoch - 1]) / n_batches[epoch - 1] if n_batches[epoch - 1] > 0 else float("inf")

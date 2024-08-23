@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal
-import numpy as np
 
 def swish(x):
     """
@@ -26,10 +25,6 @@ class EnsembleDenseLayer(nn.Module):
             act_fn (str): Activation function name ("swish" or "linear").
         """
         super().__init__()
-        # print("in_size: ", in_size)
-        # print("out_size: ", out_size)
-        # print("ensemble_size: ", ensemble_size)
-
         self.in_size = in_size
         self.out_size = out_size
         self.ensemble_size = ensemble_size
@@ -47,11 +42,7 @@ class EnsembleDenseLayer(nn.Module):
         Returns:
             torch.Tensor: Output tensor after applying the linear transformation and activation function.
         """
-        # Ensure that all tensors are of the same dtype
-        x = x.to(self.weights.dtype)
-        self.biases = self.biases.to(self.weights.dtype)
-
-        # Perform the operation
+        x = x.to(self.weights.dtype)  # Ensure the input tensor has the same dtype as the weights
         op = torch.baddbmm(self.biases, x, self.weights)
         op = self.act_fn(op)
         return op
@@ -183,10 +174,9 @@ class EnsembleModel(nn.Module):
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: Mean and variance of the state deltas.
         """
-        # print("states.shape: ", states.shape)
-        # print("actions.shape: ", goals.shape)
+        print(f'states.shape: {states.shape}')
+        print(f'goals.shape: {goals.shape}')
         inp = torch.cat((states, goals), dim=2)  # Concatenate states and goals
-        # print("inp.shape: ", inp.shape)
         op = self.fc_1(inp)  # First hidden layer
         op = self.fc_2(op)   # Second hidden layer
         op = self.fc_3(op)   # Third hidden layer
@@ -210,13 +200,6 @@ class EnsembleModel(nn.Module):
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: Normalized states and goals.
         """
-        if isinstance(states, np.ndarray):
-            states = torch.from_numpy(states).float().to(self.device)
-        if isinstance(goals, np.ndarray):
-            goals = torch.from_numpy(goals).float().to(self.device)
-
-        states = states.to(self.device)
-        goals = goals.to(self.device)
         states = self.normalizer.normalize_states(states)
         goals = self.normalizer.normalize_goals(goals)
         return states, goals
@@ -231,9 +214,7 @@ class EnsembleModel(nn.Module):
         Returns:
             torch.Tensor: Normalized target state deltas.
         """
-        goal_deltas = goal_deltas.to(self.device)
-        goal_deltas = self.normalizer.normalize_goal_deltas(goal_deltas)
-        return goal_deltas
+        return self.normalizer.normalize_goal_deltas(goal_deltas)
 
     def _post_process_model_outputs(self, delta_mean, delta_var):
         """
@@ -314,7 +295,7 @@ class LowLevelEnsembleModel(nn.Module):
         loss = (delta_mu - delta_targets) ** 2 / delta_var + torch.log(delta_var)
         loss = loss.mean(-1).mean(-1).sum()
         return loss
-    
+
     def sample(self, mean, var):
         return Normal(mean, torch.sqrt(var)).sample()
 
@@ -360,8 +341,6 @@ class LowLevelEnsembleModel(nn.Module):
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: Normalized states and actions.
         """
-        states = states.to(self.device)
-        actions = actions.to(self.device)
         states = self.normalizer.normalize_states(states)
         actions = self.normalizer.normalize_actions(actions)
         return states, actions
@@ -376,9 +355,7 @@ class LowLevelEnsembleModel(nn.Module):
         Returns:
             torch.Tensor: Normalized target state deltas.
         """
-        state_deltas = state_deltas.to(self.device)
-        state_deltas = self.normalizer.normalize_state_deltas(state_deltas)
-        return state_deltas
+        return self.normalizer.normalize_state_deltas(state_deltas)
 
     def _post_process_model_outputs(self, delta_mean, delta_var):
         """
@@ -394,7 +371,7 @@ class LowLevelEnsembleModel(nn.Module):
         delta_mean = self.normalizer.denormalize_state_delta_means(delta_mean)
         delta_var = self.normalizer.denormalize_state_delta_vars(delta_var)
         return delta_mean, delta_var
-    
+
 class RewardModel(nn.Module):
     def __init__(self, in_size, hidden_size, act_fn="relu", device="cpu"):
         super().__init__()
@@ -436,11 +413,6 @@ class ActionModel(nn.Module):
 
     def forward(self, state, goal):
           # Convert state and goal to tensors if they are numpy arrays
-        if isinstance(state, np.ndarray):
-            state = torch.from_numpy(state).float().to(self.device)
-        if isinstance(goal, np.ndarray):
-            goal = torch.from_numpy(goal).float().to(self.device)
-
         # Debugging: Print the shapes of state and goal
         # print(f"State shape: {state.shape}, Goal shape: {goal.shape}")
         x = torch.cat([state, goal], dim=-1)
@@ -457,4 +429,3 @@ class ActionModel(nn.Module):
         self.fc1.reset_parameters()
         self.fc2.reset_parameters()
         self.fc3.reset_parameters()
-
