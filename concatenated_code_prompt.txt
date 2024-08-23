@@ -414,14 +414,14 @@ class HierarchicalTrainer(object):
             a_losses (list): List to store action model losses.
             n_batches (list): List to store the number of batches per epoch.
         """
-        for (states, goals, actions) in self.buffer.get_low_level_train_batches(self.batch_size):
+        for (states, goals, next_states) in self.buffer.get_low_level_train_batches(self.batch_size):
             self.low_level_action.train()
 
             # Zero the gradients for the low-level action model
             self.low_level_optim.zero_grad()
 
             # Compute loss for the low-level action model
-            a_loss = self.low_level_action.loss(states, goals, actions)
+            a_loss = self.low_level_action.loss(states, goals, next_states)
             
             # Backpropagate the loss
             a_loss.backward()
@@ -434,6 +434,7 @@ class HierarchicalTrainer(object):
 
             a_losses[epoch - 1].append(a_loss.item())
             n_batches[epoch - 1] += 1
+
 
         # Log the average loss every 20 epochs
         if self.logger is not None and epoch % 20 == 0:
@@ -960,8 +961,8 @@ class EnsembleModel(nn.Module):
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: Mean and variance of the state deltas.
         """
-        print(f'states.shape: {states.shape}')
-        print(f'goals.shape: {goals.shape}')
+        # print(f'states.shape: {states.shape}')
+        # print(f'goals.shape: {goals.shape}')
         inp = torch.cat((states, goals), dim=2)  # Concatenate states and goals
         op = self.fc_1(inp)  # First hidden layer
         op = self.fc_2(op)   # Second hidden layer
@@ -1207,9 +1208,21 @@ class ActionModel(nn.Module):
         action = torch.tanh(self.fc3(x))  # Use tanh to bound the action space
         return action
 
-    def loss(self, states, goals, actions):
+    # def loss(self, states, goals, actions):
+    #     predicted_actions = self.forward(states, goals)
+    #     return F.mse_loss(predicted_actions, actions)
+
+    def loss(self, states, goals, next_states):
+        # Predict the action using the current state and goal
         predicted_actions = self.forward(states, goals)
-        return F.mse_loss(predicted_actions, actions)
+
+        # Predict the next state given the current state and the predicted action
+        predicted_next_states, _ = self.ensemble(states, predicted_actions)
+
+        # Calculate the distance between the predicted next state and the goal
+        loss = torch.norm(predicted_next_states - goals, p=2, dim=-1).mean()
+
+        return loss
 
     def reset_parameters(self):
         self.fc1.reset_parameters()
@@ -1489,8 +1502,8 @@ class HighLevelPlanner(nn.Module):
             # Ensure the sampled goals are within the environment's state bounds
             goals = torch.clamp(goals, min=min_bounds, max=max_bounds)
 
-            print(f"Goals shape in forward: {goals.shape}")
-
+            # print(f"Goals input shape in forward: {goals.shape}")
+            # print(f'State input shape from forward: {state.shape}')
             states, delta_vars, delta_means = self.perform_rollout(state, goals)
 
             returns = torch.zeros(self.n_candidates).float().to(self.device)
@@ -1526,6 +1539,7 @@ class HighLevelPlanner(nn.Module):
         delta_means = [torch.empty(0)] * T
         delta_vars = [torch.empty(0)] * T
 
+        # print(f"Current state shape in perform_rollout: {current_state.shape}")
         # Prepare the initial state tensor
         current_state = current_state.unsqueeze(dim=0).unsqueeze(dim=0)
         current_state = current_state.repeat(self.ensemble_size, self.n_candidates, 1)
@@ -1983,18 +1997,20 @@ class HierarchicalAgent(object):
             while not done:
                 if step % self.context_length == 0:
                     self.current_goal = self.high_level_planner(state)
-                    print(f"Goal from high-level planner: {self.current_goal.shape}")
-                    self.logger.log("New context")
-                    if self.logger:
-                        self.logger.log(f"New high-level goal sampled at step {step}: {self.current_goal}")
+                    # print(f"Goal from high-level planner: {self.current_goal.shape}")
+                    # self.logger.log("New context")
+                    # if self.logger:
+                    #     self.logger.log(f"New high-level goal sampled at step {step}: {self.current_goal}")
 
                     if step > 0:
                         corrected_goal = self.off_policy_goal_correction(buffer, state, exploration_scale=self.high_level_planner.expl_scale)
                         #TODO: Could we update high_level action density based on the corrected goal?
                         buffer.update(corrected_goal)
-                        if self.logger:
-                            self.logger.log(f"High-level transition updated with corrected goal: {corrected_goal}")
+                        # if self.logger:
+                        #     self.logger.log(f"High-level transition updated with corrected goal: {corrected_goal}")
 
+                # print(f"Low level state: {state.shape}")
+                # print(f"Low level goal: {self.current_goal.shape}")
                 action, low_level_reward = self.low_level_planner(state, self.current_goal)
                 if action_noise is not None:
                     action = self._add_action_noise(action, action_noise)
@@ -2060,6 +2076,10 @@ class HierarchicalAgent(object):
             action = action + noise * torch.randn_like(action)
         return action
     
+
+
+    #TODO: BIG ONE!!!! Check this logic to ensure it is actually doing maximum likelihood relabling.
+    # Lots of hacks here!
     def off_policy_goal_correction(self, buffer, state, use_exploration=True, exploration_scale=1.0):
         """
         Implements off-policy goal correction with an optional exploration objective.
@@ -2096,9 +2116,12 @@ class HierarchicalAgent(object):
         # Ensure all candidate goals are torch tensors and clamp them
         candidate_goals = [torch.clamp(goal, min=obs_low, max=obs_high) for goal in candidate_goals]
 
-        # Expand goals to match the number of candidates in states
+        # Stack the candidate goals into a single tensor and match dimensions
         candidate_goals = torch.stack(candidate_goals)
-        candidate_goals = candidate_goals.unsqueeze(1).expand(-1, state.size(1), -1)
+        candidate_goals = candidate_goals.unsqueeze(0).repeat(self.high_level_planner.plan_horizon, self.high_level_planner.plan_horizon, 1)
+
+        # Expand the state dimensions to match the format expected by perform_rollout
+        state = state.unsqueeze(0).unsqueeze(0).repeat(self.high_level_planner.ensemble_size, self.high_level_planner.plan_horizon, 1)
 
         best_goal = None
         best_objective = float('-inf')
@@ -2106,11 +2129,27 @@ class HierarchicalAgent(object):
             log_prob = 0
             for i in range(len(buffer.low_level_actions)):
                 action = torch.tensor(buffer.low_level_actions[i], dtype=torch.float32, device=self.device)  # Convert action to torch.Tensor
-                predicted_action = self.low_level_planner(buffer.low_level_states[i], candidate_goal)
+                state = buffer.low_level_states[i]
+                # print(f"Low level state (correction): {state.shape}")
+                # print(f"Low level goal (correction): {candidate_goal[0].shape}")
+                predicted_action = self.low_level_planner(state, candidate_goal[0])
                 log_prob += -0.5 * torch.norm(action - predicted_action[0], p=2).item() ** 2
 
             if use_exploration is not None:
-                delta_means, delta_vars = self.high_level_planner.perform_rollout(state, candidate_goal.unsqueeze(0))
+             
+                if not isinstance(state, torch.Tensor):
+                    state = torch.tensor(state, dtype=torch.float32, device=self.device)
+                # First, reshape the candidate_goal to separate the first dimension into two dimensions [5, 10, 3]
+
+                candidate_goal = candidate_goal.view(self.high_level_planner.plan_horizon, 10, self.env.observation_space.shape[0])
+
+                # Now, use repeat to expand the tensor to the desired shape [5, 500, 3]
+                candidate_goal = candidate_goal.repeat(1, 50, 1)
+                # candidate_goal = candidate_goal.repeat(1, n_episodes*max_episde_length, 1)
+                # candidate_goals= candidate_goals.unsqueeze(0).repeat(self.high_level_planner.plan_horizon, self.high_level_planner.plan_horizon, 1)
+                # print(f"Goals input shape in off_policy_goal_correction: {candidate_goal.shape}")
+                # print(f'State input shape from off_policy_goal_correction: {state.shape}')
+                _, delta_vars, delta_means= self.high_level_planner.perform_rollout(state, candidate_goal)
                 exploration_bonus = self.high_level_planner.measure(delta_means, delta_vars).sum().item()
             else:
                 exploration_bonus = 0
@@ -2121,10 +2160,14 @@ class HierarchicalAgent(object):
                 best_objective = objective
                 best_goal = candidate_goal
 
-        if self.logger:
-            self.logger.log(f"Off-policy goal correction: Selected goal={best_goal} with objective={best_objective}")
+        # if self.logger:
+        #     self.logger.log(f"Off-policy goal correction: Selected goal={best_goal} with objective={best_objective}")
 
-        return best_goal
+        # return best_goal
+        return best_goal[0][0]
+
+
+
 
 
 

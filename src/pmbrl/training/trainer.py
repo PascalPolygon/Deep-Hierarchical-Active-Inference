@@ -133,15 +133,15 @@ class HierarchicalTrainer(object):
             a_losses (list): List to store action model losses.
             n_batches (list): List to store the number of batches per epoch.
         """
-        for (states, goals, actions) in self.buffer.get_low_level_train_batches(self.batch_size):
+        for (states, goals, next_states) in self.buffer.get_low_level_train_batches(self.batch_size):
             self.low_level_action.train()
 
             # Zero the gradients for the low-level action model
             self.low_level_optim.zero_grad()
 
             # Compute loss for the low-level action model
-            a_loss = self.low_level_action.loss(states, goals, actions)
-            
+            a_loss = self.low_level_action.loss(states, goals, self.high_level_ensemble)
+
             # Backpropagate the loss
             a_loss.backward()
             
@@ -153,6 +153,7 @@ class HierarchicalTrainer(object):
 
             a_losses[epoch - 1].append(a_loss.item())
             n_batches[epoch - 1] += 1
+
 
         # Log the average loss every 20 epochs
         if self.logger is not None and epoch % 20 == 0:

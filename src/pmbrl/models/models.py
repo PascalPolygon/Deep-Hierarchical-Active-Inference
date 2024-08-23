@@ -421,9 +421,22 @@ class ActionModel(nn.Module):
         action = torch.tanh(self.fc3(x))  # Use tanh to bound the action space
         return action
 
-    def loss(self, states, goals, actions):
+    # def loss(self, states, goals, actions):
+    #     predicted_actions = self.forward(states, goals)
+    #     return F.mse_loss(predicted_actions, actions)
+
+    def loss(self, states, goals, ensemble):
+
+        # Predict the action using the current state and goal
         predicted_actions = self.forward(states, goals)
-        return F.mse_loss(predicted_actions, actions)
+
+        # Predict the next state given the current state and the predicted action
+        predicted_next_states, _ = ensemble(states, predicted_actions)
+
+        # Calculate the distance between the predicted next state and the goal
+        loss = torch.norm(predicted_next_states - goals, p=2, dim=-1).mean()
+
+        return loss
 
     def reset_parameters(self):
         self.fc1.reset_parameters()
