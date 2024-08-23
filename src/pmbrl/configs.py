@@ -91,7 +91,7 @@ class DebugConfig(Config):
         super().__init__()
         self.env_name = "Pendulum-v0"
         self.n_episodes = 5
-        self.max_episode_len = 100
+        self.max_episode_len = 10
         self.hidden_size = 64
         self.plan_horizon = 5
 
@@ -101,15 +101,24 @@ class MountainCarConfig(Config):
         super().__init__()
         self.logdir = "mountain_car"
         self.env_name = "SparseMountainCar"
-        self.max_episode_len = 500
-        self.n_train_epochs = 100
+        # self.max_episode_len = 500
+        # self.n_train_epochs = 100
+        # self.n_seed_episodes = 1
+        # self.expl_scale = 1.0
+        # self.action_noise_scale = 0.1
+        # self.n_episodes = 30
+        # self.ensemble_size = 25
+        # self.record_every = None
+        # self.n_episodes = 50
+
+        self.max_episode_len = 5
+        self.n_train_epochs = 1
         self.n_seed_episodes = 1
         self.expl_scale = 1.0
-        self.action_noise_scale = 0.1
-        self.n_episodes = 30
-        self.ensemble_size = 25
+        self.n_episodes = 3
+        self.ensemble_size = 5
         self.record_every = None
-        self.n_episodes = 50
+        self.n_episodes = 5
 
 
 class CupCatchConfig(Config):

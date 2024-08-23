@@ -116,16 +116,20 @@ class HierarchicalAgent(object):
             while not done:
                 if step % self.context_length == 0:
                     self.current_goal = self.high_level_planner(state)
-                    self.logger.log("New context")
-                    if self.logger:
-                        self.logger.log(f"New high-level goal sampled at step {step}: {self.current_goal}")
+                    # print(f"Goal from high-level planner: {self.current_goal.shape}")
+                    # self.logger.log("New context")
+                    # if self.logger:
+                    #     self.logger.log(f"New high-level goal sampled at step {step}: {self.current_goal}")
 
                     if step > 0:
                         corrected_goal = self.off_policy_goal_correction(buffer, state, exploration_scale=self.high_level_planner.expl_scale)
+                        #TODO: Could we update high_level action density based on the corrected goal?
                         buffer.update(corrected_goal)
-                        if self.logger:
-                            self.logger.log(f"High-level transition updated with corrected goal: {corrected_goal}")
+                        # if self.logger:
+                        #     self.logger.log(f"High-level transition updated with corrected goal: {corrected_goal}")
 
+                # print(f"Low level state: {state.shape}")
+                # print(f"Low level goal: {self.current_goal.shape}")
                 action, low_level_reward = self.low_level_planner(state, self.current_goal)
                 if action_noise is not None:
                     action = self._add_action_noise(action, action_noise)
@@ -135,14 +139,16 @@ class HierarchicalAgent(object):
 
                 # if not isinstance(self.current_goal, torch.Tensor):
                 #     self.current_goal = torch.from_numpy(self.current_goal).float().to(self.device)
-                if not isinstance(state, torch.Tensor):
-                    state = torch.from_numpy(state).float().to(self.device)
+                # if not isinstance(state, torch.Tensor):
+                #     state = torch.from_numpy(state).float().to(self.device)
+                if not isinstance(self.current_goal, np.ndarray):
+                    self.current_goal = np.array(self.current_goal)
 
                 self.next_goal = state + self.current_goal - next_state
                 total_reward += reward
                 total_steps += 1
 
-                if self.logger:
+                if self.logger: 
                     self.logger.log(f"Step {step}: state={state}, goal={self.current_goal}, action={action}, reward={reward}, next_state={next_state}, next_goal={self.next_goal}")
 
                 if self.logger and total_steps % 25 == 0:
@@ -150,7 +156,7 @@ class HierarchicalAgent(object):
 
                 if buffer is not None:
                     # self.logger.log(f"Action: {action}")
-                    buffer.add(deepcopy(state), deepcopy(self.current_goal), action[0], reward + low_level_reward, deepcopy(next_state), deepcopy(self.next_goal))
+                    buffer.add(deepcopy(state), deepcopy(self.current_goal), action, reward, deepcopy(next_state), deepcopy(self.next_goal))
                     # if self.logger:
                     #     self.logger.log(f"Low-level transition added: state={state}, goal={self.current_goal}, action={action}, reward={reward + low_level_reward}, next_state={next_state}, next_goal={self.next_goal}")
 
@@ -189,6 +195,10 @@ class HierarchicalAgent(object):
             action = action + noise * torch.randn_like(action)
         return action
     
+
+
+    #TODO: BIG ONE!!!! Check this logic to ensure it is actually doing maximum likelihood relabling.
+    # Lots of hacks here!
     def off_policy_goal_correction(self, buffer, state, use_exploration=True, exploration_scale=1.0):
         """
         Implements off-policy goal correction with an optional exploration objective.
@@ -205,28 +215,60 @@ class HierarchicalAgent(object):
         state = torch.from_numpy(state).float().to(self.device)
         candidate_goals = []
 
-        candidate_goals.append(self.current_goal)
-        candidate_goals.append(buffer.high_level_next_states[-1] - buffer.high_level_states[-1])
+        # Ensure that current_goal is a torch.Tensor
+        if not isinstance(self.current_goal, torch.Tensor):
+            self.current_goal = torch.tensor(self.current_goal, dtype=torch.float32, device=self.device)
 
-        mean = buffer.high_level_next_states[-1] - buffer.high_level_states[-1]
+        candidate_goals.append(self.current_goal)
+        candidate_goals.append(torch.tensor(buffer.high_level_next_states[-1] - buffer.high_level_states[-1], dtype=torch.float32, device=self.device))
+
+        mean = candidate_goals[1]
         std_dev = 0.5 * torch.std(self.current_goal).item() * torch.ones_like(mean)
         for _ in range(8):
             sampled_goal = torch.normal(mean, std_dev).to(self.device)
             candidate_goals.append(sampled_goal)
 
-        candidate_goals = [torch.clamp(goal, min=self.env.observation_space.low, max=self.env.observation_space.high) for goal in candidate_goals]
+        # Convert numpy arrays to torch tensors
+        obs_low = torch.tensor(self.env.observation_space.low, dtype=torch.float32, device=self.device)
+        obs_high = torch.tensor(self.env.observation_space.high, dtype=torch.float32, device=self.device)
+
+        # Ensure all candidate goals are torch tensors and clamp them
+        candidate_goals = [torch.clamp(goal, min=obs_low, max=obs_high) for goal in candidate_goals]
+
+        # Stack the candidate goals into a single tensor and match dimensions
+        candidate_goals = torch.stack(candidate_goals)
+        candidate_goals = candidate_goals.unsqueeze(0).repeat(self.high_level_planner.plan_horizon, self.high_level_planner.plan_horizon, 1)
+
+        # Expand the state dimensions to match the format expected by perform_rollout
+        state = state.unsqueeze(0).unsqueeze(0).repeat(self.high_level_planner.ensemble_size, self.high_level_planner.plan_horizon, 1)
 
         best_goal = None
         best_objective = float('-inf')
         for candidate_goal in candidate_goals:
             log_prob = 0
             for i in range(len(buffer.low_level_actions)):
-                action = buffer.low_level_actions[i]
-                predicted_action = self.low_level_planner(buffer.low_level_states[i], candidate_goal)
+                action = torch.tensor(buffer.low_level_actions[i], dtype=torch.float32, device=self.device)  # Convert action to torch.Tensor
+                state = buffer.low_level_states[i]
+                # print(f"Low level state (correction): {state.shape}")
+                # print(f"Low level goal (correction): {candidate_goal[0].shape}")
+                predicted_action = self.low_level_planner(state, candidate_goal[0])
                 log_prob += -0.5 * torch.norm(action - predicted_action[0], p=2).item() ** 2
 
-            if use_exploration and self.exploration_measure is not None:
-                delta_means, delta_vars = self.high_level_planner.perform_rollout(state, candidate_goal.unsqueeze(0))
+            if use_exploration is not None:
+             
+                if not isinstance(state, torch.Tensor):
+                    state = torch.tensor(state, dtype=torch.float32, device=self.device)
+                # First, reshape the candidate_goal to separate the first dimension into two dimensions [5, 10, 3]
+
+                candidate_goal = candidate_goal.view(self.high_level_planner.plan_horizon, 10, self.env.observation_space.shape[0])
+
+                # Now, use repeat to expand the tensor to the desired shape [5, 500, 3]
+                candidate_goal = candidate_goal.repeat(1, 50, 1)
+                # candidate_goal = candidate_goal.repeat(1, n_episodes*max_episde_length, 1)
+                # candidate_goals= candidate_goals.unsqueeze(0).repeat(self.high_level_planner.plan_horizon, self.high_level_planner.plan_horizon, 1)
+                # print(f"Goals input shape in off_policy_goal_correction: {candidate_goal.shape}")
+                # print(f'State input shape from off_policy_goal_correction: {state.shape}')
+                _, delta_vars, delta_means= self.high_level_planner.perform_rollout(state, candidate_goal)
                 exploration_bonus = self.high_level_planner.measure(delta_means, delta_vars).sum().item()
             else:
                 exploration_bonus = 0
@@ -237,10 +279,17 @@ class HierarchicalAgent(object):
                 best_objective = objective
                 best_goal = candidate_goal
 
-        if self.logger:
-            self.logger.log(f"Off-policy goal correction: Selected goal={best_goal} with objective={best_objective}")
+        # if self.logger:
+        #     self.logger.log(f"Off-policy goal correction: Selected goal={best_goal} with objective={best_objective}")
 
-        return best_goal
+        # return best_goal
+        return best_goal[0][0]
+
+
+
+
+
+
 
 
 

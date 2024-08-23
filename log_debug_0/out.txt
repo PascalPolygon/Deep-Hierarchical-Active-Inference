@@ -1,0 +1,173 @@
+00:51:30
+
+=== Loading experiment [device: cpu] ===
+
+{'action_noise': None,
+ 'action_noise_scale': 0.1,
+ 'action_repeat': 3,
+ 'batch_size': 50,
+ 'context_length': 7,
+ 'coverage': False,
+ 'ensemble_size': 10,
+ 'env_name': 'Pendulum-v0',
+ 'epsilon': 1e-08,
+ 'expl_scale': 1.0,
+ 'expl_strategy': 'information',
+ 'grad_clip_norm': 1000,
+ 'hidden_size': 64,
+ 'learning_rate': 0.001,
+ 'logdir': 'debug',
+ 'max_episode_len': 10,
+ 'n_candidates': 500,
+ 'n_episodes': 5,
+ 'n_seed_episodes': 5,
+ 'n_train_epochs': 100,
+ 'optimisation_iters': 5,
+ 'plan_horizon': 5,
+ 'record_every': None,
+ 'reward_scale': 1.0,
+ 'seed': 0,
+ 'strategy': 'information',
+ 'top_candidates': 50,
+ 'use_exploration': True,
+ 'use_mean': False,
+ 'use_reward': True}
+Low-level transition added: state=[-0.94223519 -0.33495202  0.93078187], goal=[-0.93790663 -0.34688782 -0.34901916], action=[-1.0817322], reward=-23.326185751528634, next_state=[-0.93790663 -0.34688782 -0.34901916], next_goal=[-0.93790663 -0.34688782 -0.34901916]
+Low-level transition added: state=[-0.93790663 -0.34688782 -0.34901916], goal=[-0.97079554 -0.23990838 -0.92184516], action=[0.31315476], reward=-23.938128391809286, next_state=[-0.97079554 -0.23990838 -0.92184516], next_goal=[-0.97079554 -0.23990838 -0.92184516]
+Low-level transition added: state=[-0.97079554 -0.23990838 -0.92184516], goal=[-0.99852493 -0.05429511 -1.37463706], action=[-0.09277163], reward=-26.620724533373753, next_state=[-0.99852493 -0.05429511 -1.37463706], next_goal=[-0.99852493 -0.05429511 -1.37463706]
+Low-level transition added: state=[-0.99852493 -0.05429511 -1.37463706], goal=[-0.9999472   0.01027591 -1.29195824], action=[0.82266766], reward=-9.720880702996926, next_state=[-0.9999472   0.01027591 -1.29195824], next_goal=[-0.9999472   0.01027591 -1.29195824]
+Episode 1/5 complete.
+Low-level transition added: state=[ 0.67212466  0.74043801 -0.41996531], goal=[0.53171387 0.84692406 1.99301855], action=[1.557232], reward=-2.4250640187454886, next_state=[0.53171387 0.84692406 1.99301855], next_goal=[0.53171387 0.84692406 1.99301855]
+Low-level transition added: state=[0.53171387 0.84692406 1.99301855], goal=[0.09971959 0.99501558 3.65339724], action=[-0.83351076], reward=-5.9301219684567865, next_state=[0.09971959 0.99501558 3.65339724], next_goal=[0.09971959 0.99501558 3.65339724]
+Low-level transition added: state=[0.09971959 0.99501558 3.65339724], goal=[-0.5802266   0.81445509  5.3411086 ], action=[-1.1286852], reward=-14.129381183148295, next_state=[-0.5802266   0.81445509  5.3411086 ], next_goal=[-0.5802266   0.81445509  5.3411086 ]
+Low-level transition added: state=[-0.5802266   0.81445509  5.3411086 ], goal=[-0.78785932  0.61585526  5.7663677 ], action=[-1.2372147], reward=-7.649512941444233, next_state=[-0.78785932  0.61585526  5.7663677 ], next_goal=[-0.78785932  0.61585526  5.7663677 ]
+Episode 2/5 complete.
+Low-level transition added: state=[-0.79974405 -0.60034112  0.3461527 ], goal=[-0.87109736 -0.49111036 -1.4611028 ], action=[-1.1108167], reward=-19.173730247478026, next_state=[-0.87109736 -0.49111036 -1.4611028 ], next_goal=[-0.87109736 -0.49111036 -1.4611028 ]
+Low-level transition added: state=[-0.87109736 -0.49111036 -1.4611028 ], goal=[-0.99146884 -0.13034391 -3.01594197], action=[-1.5084316], reward=-23.855297893311665, next_state=[-0.99146884 -0.13034391 -3.01594197], next_goal=[-0.99146884 -0.13034391 -3.01594197]
+Low-level transition added: state=[-0.99146884 -0.13034391 -3.01594197], goal=[-0.95579428  0.29403621 -2.67326379], action=[0.67213714], reward=-30.329576342403662, next_state=[-0.95579428  0.29403621 -2.67326379], next_goal=[-0.95579428  0.29403621 -2.67326379]
+Low-level transition added: state=[-0.95579428  0.29403621 -2.67326379], goal=[-0.9075241   0.42000001 -2.69996654], action=[-1.6481993], reward=-8.800827700964302, next_state=[-0.9075241   0.42000001 -2.69996654], next_goal=[-0.9075241   0.42000001 -2.69996654]
+Episode 3/5 complete.
+Low-level transition added: state=[ 0.78073179 -0.62486628  0.33969213], goal=[ 0.68313805 -0.73028926 -1.62552782], action=[-1.144136], reward=-1.5901907208886998, next_state=[ 0.68313805 -0.73028926 -1.62552782], next_goal=[ 0.68313805 -0.73028926 -1.62552782]
+Low-level transition added: state=[ 0.68313805 -0.73028926 -1.62552782], goal=[ 0.34925539 -0.93702757 -3.19222783], action=[0.5145179], reward=-4.024414599831426, next_state=[ 0.34925539 -0.93702757 -3.19222783], next_goal=[ 0.34925539 -0.93702757 -3.19222783]
+Low-level transition added: state=[ 0.34925539 -0.93702757 -3.19222783], goal=[-0.38649199 -0.92229276 -5.96168723], action=[-1.2867377], reward=-11.490675163419326, next_state=[-0.38649199 -0.92229276 -5.96168723], next_goal=[-0.38649199 -0.92229276 -5.96168723]
+Low-level transition added: state=[-0.38649199 -0.92229276 -5.96168723], goal=[-0.66090679 -0.750468   -6.50402878], action=[0.9958535], reward=-7.426696773965055, next_state=[-0.66090679 -0.750468   -6.50402878], next_goal=[-0.66090679 -0.750468   -6.50402878]
+Episode 4/5 complete.
+Low-level transition added: state=[-0.93014847 -0.36718363  0.05397449], goal=[-0.96325838 -0.2685764  -1.04946165], action=[-0.7225659], reward=-23.387376960586177, next_state=[-0.96325838 -0.2685764  -1.04946165], next_goal=[-0.96325838 -0.2685764  -1.04946165]
+Low-level transition added: state=[-0.96325838 -0.2685764  -1.04946165], goal=[-0.99963615 -0.02697362 -1.86898304], action=[-0.83714217], reward=-26.572335686812174, next_state=[-0.99963615 -0.02697362 -1.86898304], next_goal=[-0.99963615 -0.02697362 -1.86898304]
+Low-level transition added: state=[-0.99963615 -0.02697362 -1.86898304], goal=[-0.96623417  0.25766555 -1.86882113], action=[-0.34873208], reward=-29.085617776124955, next_state=[-0.96623417  0.25766555 -1.86882113], next_goal=[-0.96623417  0.25766555 -1.86882113]
+Low-level transition added: state=[-0.96623417  0.25766555 -1.86882113], goal=[-0.94015146  0.34075686 -1.74232874], action=[-0.44504508], reward=-8.649534934768313, next_state=[-0.94015146  0.34075686 -1.74232874], next_goal=[-0.94015146  0.34075686 -1.74232874]
+Episode 5/5 complete.
+
+Collected seeds: [5 episodes | 20 frames]
+
+=== Episode 1 ===
+Training on [20/60] data points
+> High-Level Train epoch 20 [ensemble 258.94 | reward 8895.60]
+> Low-Level Train epoch 20 [action 0.00]
+> High-Level Train epoch 40 [ensemble 95.10 | reward 8371.47]
+> Low-Level Train epoch 40 [action 0.00]
+> High-Level Train epoch 60 [ensemble 25.16 | reward 7476.31]
+> Low-Level Train epoch 60 [action 0.00]
+> High-Level Train epoch 80 [ensemble 8.09 | reward 6291.41]
+> Low-Level Train epoch 80 [action 0.00]
+> High-Level Train epoch 100 [ensemble 4.62 | reward 4886.96]
+> Low-Level Train epoch 100 [action 0.00]
+Ensemble loss 4.62 / Reward Loss 4886.96 / Action Loss 0.00
+
+=== Collecting data [1] ===
+Step 0: state=[-0.96812732 -0.25045857  0.95588815], goal=[-0.35372955  0.28826424  0.27942124], action=[-0.98100364], reward=-24.737126156886134, next_state=[-0.95761291 -0.28805818 -0.10345442], next_goal=[-0.36424396  0.32586386  1.33876381]
+Step 1: state=[-0.95761291 -0.28805818 -0.10345442], goal=[-0.62836844  0.68901885  0.2764131 ], action=[0.7894653], reward=-24.570970051393708, next_state=[-0.96915839 -0.24643867 -0.37134296], next_goal=[-0.61682296  0.64739933  0.54430165]
+Step 2: state=[-0.96915839 -0.24643867 -0.37134296], goal=[-0.72509325  0.69281805  0.27405512], action=[0.9433285], reward=-25.524754372334055, next_state=[-0.98323281 -0.18235472 -0.45489562], next_goal=[-0.71101882  0.62873409  0.35760778]
+Step 3: state=[-0.98323281 -0.18235472 -0.45489562], goal=[-0.7776652  0.7498065  0.2800001], action=[0.95618165], reward=-8.772624701611194, next_state=[-0.98707243 -0.16027483 -0.4482344 ], next_goal=[-0.77382558  0.72772663  0.27333887]
+Episode complete. Total reward: -83.60547528222509, Total steps: 4
+Rewards -83.61 / Steps 4.00
+Reward stats:
+ {'max': '-64.40', 'mean': '-80.09', 'min': '-117.38', 'std': '8.53'}
+Information gain stats:
+ {'max': '7.45', 'mean': '1.48', 'min': '-3.42', 'std': '1.48'}
+Episode time 4.92
+Saved _metrics_
+
+=== Episode 2 ===
+Training on [24/72] data points
+> High-Level Train epoch 20 [ensemble 281.36 | reward 11832.48]
+> Low-Level Train epoch 20 [action 0.00]
+> High-Level Train epoch 40 [ensemble 112.15 | reward 11399.90]
+> Low-Level Train epoch 40 [action 0.00]
+> High-Level Train epoch 60 [ensemble 41.82 | reward 10635.62]
+> Low-Level Train epoch 60 [action 0.00]
+> High-Level Train epoch 80 [ensemble 19.65 | reward 9542.09]
+> Low-Level Train epoch 80 [action 0.00]
+> High-Level Train epoch 100 [ensemble 11.29 | reward 8142.25]
+> Low-Level Train epoch 100 [action 0.00]
+Ensemble loss 11.29 / Reward Loss 8142.25 / Action Loss 0.00
+
+=== Collecting data [2] ===
+Step 0: state=[ 0.97300686 -0.23077618  0.25929587], goal=[-0.80006653  0.82596445 -0.150875  ], action=[-0.9996153], reward=-0.20050968668803565, next_state=[ 0.95768602 -0.28781501 -0.72857798], next_goal=[-0.78474569  0.88300328  0.83699885]
+Step 1: state=[ 0.95768602 -0.28781501 -0.72857798], goal=[-0.91294205  0.893404   -0.382023  ], action=[-0.993471], reward=-0.7828120813388721, next_state=[ 0.86824757 -0.4961312  -1.95312422], next_goal=[-0.82350359  1.10172019  0.84252323]
+Step 2: state=[ 0.86824757 -0.4961312  -1.95312422], goal=[-0.9580586   0.94855034 -0.08176886], action=[-0.9967483], reward=-3.2590594086152134, next_state=[ 0.55324    -0.83302191 -3.75960327], next_goal=[-0.64305103  1.28544106  1.72471019]
+Step 3: state=[ 0.55324    -0.83302191 -3.75960327], goal=[-0.937467   0.9515283  0.0172975], action=[-0.9987842], reward=-2.3837932986473027, next_state=[ 0.35184305 -0.93605901 -4.53418734], next_goal=[-0.73607003  1.05456541  0.79188157]
+Episode complete. Total reward: -6.6261744752894245, Total steps: 4
+Rewards -6.63 / Steps 4.00
+Reward stats:
+ {'max': '-44.13', 'mean': '-67.20', 'min': '-134.98', 'std': '16.17'}
+Information gain stats:
+ {'max': '8.29', 'mean': '1.66', 'min': '-3.79', 'std': '1.46'}
+Episode time 4.62
+Saved _metrics_
+
+=== Episode 3 ===
+Training on [28/84] data points
+> High-Level Train epoch 20 [ensemble 454.00 | reward 11373.42]
+> Low-Level Train epoch 20 [action 0.00]
+> High-Level Train epoch 40 [ensemble 174.75 | reward 10758.66]
+> Low-Level Train epoch 40 [action 0.00]
+> High-Level Train epoch 60 [ensemble 82.99 | reward 9812.62]
+> Low-Level Train epoch 60 [action 0.00]
+> High-Level Train epoch 80 [ensemble 51.15 | reward 8573.69]
+> Low-Level Train epoch 80 [action 0.00]
+> High-Level Train epoch 100 [ensemble 37.07 | reward 7071.54]
+> Low-Level Train epoch 100 [action 0.00]
+Ensemble loss 37.07 / Reward Loss 7071.54 / Action Loss 0.00
+
+=== Collecting data [3] ===
+Step 0: state=[-0.9451625   0.32660043  0.39855565], goal=[-0.94460297  0.04901053 -0.6008954 ], action=[-0.99971116], reward=-24.186489142509963, next_state=[-0.969385    0.24554577  0.62791089], next_goal=[-0.92038047  0.13006519 -0.83025065]
+Step 1: state=[-0.969385    0.24554577  0.62791089], goal=[-0.93324107 -0.2177927  -0.40928203], action=[-0.99969614], reward=-25.831847731038707, next_state=[-0.98899487  0.14794984  0.65748291], next_goal=[-0.9136312  -0.12019677 -0.43885404]
+Step 2: state=[-0.98899487  0.14794984  0.65748291], goal=[-0.94029117 -0.0966948  -0.60001063], action=[-0.99992025], reward=-27.532518437156355, next_state=[-0.99781844  0.06601783  0.47367932], next_goal=[-0.93146759 -0.0147628  -0.41620704]
+Step 3: state=[-0.99781844  0.06601783  0.47367932], goal=[-0.9403794   0.05148768 -0.43357807], action=[-0.99931276], reward=-9.482300763462097, next_state=[-0.99887678  0.04738334  0.37329579], next_goal=[-0.93932105  0.07012217 -0.33319454]
+Episode complete. Total reward: -87.03315607416712, Total steps: 4
+Rewards -87.03 / Steps 4.00
+Reward stats:
+ {'max': '-71.44', 'mean': '-82.00', 'min': '-119.44', 'std': '8.24'}
+Information gain stats:
+ {'max': '8.24', 'mean': '2.17', 'min': '-2.85', 'std': '1.45'}
+Episode time 4.58
+Saved _metrics_
+
+=== Episode 4 ===
+Training on [32/96] data points
+> High-Level Train epoch 20 [ensemble 469.73 | reward 10386.39]
+> Low-Level Train epoch 20 [action 0.00]
+> High-Level Train epoch 40 [ensemble 189.22 | reward 9821.63]
+> Low-Level Train epoch 40 [action 0.00]
+> High-Level Train epoch 60 [ensemble 93.36 | reward 8932.16]
+> Low-Level Train epoch 60 [action 0.00]
+> High-Level Train epoch 80 [ensemble 56.03 | reward 7736.86]
+> Low-Level Train epoch 80 [action 0.00]
+> High-Level Train epoch 100 [ensemble 42.68 | reward 6283.98]
+> Low-Level Train epoch 100 [action 0.00]
+Ensemble loss 42.68 / Reward Loss 6283.98 / Action Loss 0.00
+
+=== Collecting data [4] ===
+Step 0: state=[ 0.95756789 -0.2882078   0.80556372], goal=[-0.90798074 -0.30087024  0.24081855], action=[-0.9999982], reward=-0.3172925881127268, next_state=[ 0.96137775 -0.2752323  -0.25802284], next_goal=[-0.9117906  -0.31384574  1.3044051 ]
+Step 1: state=[ 0.96137775 -0.2752323  -0.25802284], goal=[-0.96837234  0.4083095   0.40203792], action=[-0.99988586], reward=-0.44858433814178134, next_state=[ 0.90916457 -0.41643701 -1.40651236], next_goal=[-0.91615917  0.5495142   1.55052744]
+Step 2: state=[ 0.90916457 -0.41643701 -1.40651236], goal=[-0.9640371  0.8631749  0.9361907], action=[-0.99899065], reward=-1.9936499702236568, next_state=[ 0.70225585 -0.71192466 -2.9924363 ], next_goal=[-0.7571284   1.15866256  2.52211466]
+Step 3: state=[ 0.70225585 -0.71192466 -2.9924363 ], goal=[-0.9594157   0.8513942   0.97018576], action=[-0.9981564], reward=-1.5241002598697175, next_state=[ 0.56030673 -0.8282852  -3.67610325], next_goal=[-0.81746655  0.96775472  1.65385271]
+Episode complete. Total reward: -4.283627156347882, Total steps: 4
+Rewards -4.28 / Steps 4.00
+Reward stats:
+ {'max': '-60.37', 'mean': '-98.35', 'min': '-189.47', 'std': '24.67'}
+Information gain stats:
+ {'max': '7.47', 'mean': '2.31', 'min': '-2.52', 'std': '1.34'}
+Episode time 4.42
+Saved _metrics_

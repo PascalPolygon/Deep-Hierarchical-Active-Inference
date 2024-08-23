@@ -16,7 +16,7 @@ class Buffer(object):
         normalizer,
         context_length,
         signal_noise=None,
-        buffer_size=10 ** 6,
+        buffer_size=10 ** 3,
         device="cpu",
     ):
         self.state_size = state_size
@@ -59,8 +59,16 @@ class Buffer(object):
             next_goal (np.ndarray): The next goal after the action.
         """
         idx = self._total_steps % self.buffer_size
+        # print(f"Type of state: {type(state)}")
+        # print(f"Type of goal: {type(goal)}")
+        # print(f"Type of action: {type(action)}")
+        # print(f"Type of reward: {type(reward)}")
+        # print(f"Type of next_state: {type(next_state)}")
+        # print(f"Type of next_goal: {type(next_goal)}")
+
         state_delta = next_state - state
 
+        print(f"Action shape: {action.shape}")
         self.low_level_states[idx] = state
         self.low_level_actions[idx] = action
         self.low_level_rewards[idx] = reward
@@ -167,7 +175,9 @@ class Buffer(object):
             Tuple of torch.Tensor: Batches of states, goals, and actions.
         """
         size = len(self.low_level_states)
-        print("Size of low level states: ", size)
+        # print("Size of low-level states: ", size)
+        
+        # Create indices with permutation for each ensemble member
         indices = [
             np.random.permutation(range(size)) for _ in range(self.ensemble_size)
         ]
@@ -178,8 +188,8 @@ class Buffer(object):
             if (j - i) < batch_size and i != 0:
                 return
 
-            batch_indices = indices[i:j]
             batch_size = j - i
+            batch_indices = indices[i:j].flatten()  # Flattening the batch indices
 
             # Fetch and convert to tensors
             states = torch.from_numpy(self.low_level_states[batch_indices]).float().to(self.device)
@@ -193,6 +203,7 @@ class Buffer(object):
 
             yield states, goals, actions
 
+
     def get_high_level_train_batches(self, batch_size):
         """
         Get batches of high-level experiences for training.
@@ -204,7 +215,9 @@ class Buffer(object):
             Tuple of torch.Tensor: Batches of states, goals, rewards, and state deltas.
         """
         size = len(self.high_level_states)
-        print("Size of high level states: ", size)
+        # print("Size of high level states: ", size)
+        
+        # Create indices with permutation for each ensemble member
         indices = [
             np.random.permutation(range(size)) for _ in range(self.ensemble_size)
         ]
@@ -215,8 +228,8 @@ class Buffer(object):
             if (j - i) < batch_size and i != 0:
                 return
 
-            batch_indices = indices[i:j]
             batch_size = j - i
+            batch_indices = indices[i:j].flatten()  # Flattening the batch indices
 
             # Fetch high-level data and convert to tensors
             states = torch.from_numpy(np.array(self.high_level_states)[batch_indices]).float().to(self.device)
@@ -226,14 +239,16 @@ class Buffer(object):
 
             if self.signal_noise is not None:
                 states = states + self.signal_noise * torch.randn_like(states)
+            
             # Reshape for ensemble processing
-            print("States before reshaping: ", states.shape)
+            # print("States before reshaping: ", states.shape)
             states = states.reshape(self.ensemble_size, batch_size, self.state_size)
             goals = goals.reshape(self.ensemble_size, batch_size, self.goal_size)
             rewards = rewards.reshape(self.ensemble_size, batch_size, 1)
             goal_deltas = goal_deltas.reshape(self.ensemble_size, batch_size, self.state_size)
 
             yield states, goals, rewards, goal_deltas
+
 
     def __len__(self):
         return min(self._total_steps, self.buffer_size)

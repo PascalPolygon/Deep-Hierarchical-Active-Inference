@@ -207,3 +207,5 @@ Collected seeds: [1 episodes | 167 frames]
 Training on [167/501] data points
 > High-Level Train epoch 20 [ensemble 10.36 | reward 0.00]
 > Low-Level Train epoch 20 [action 0.00]
+> High-Level Train epoch 40 [ensemble -17.45 | reward 0.00]
+> Low-Level Train epoch 40 [action 0.00]

@@ -73,6 +73,8 @@ class HighLevelPlanner(nn.Module):
             # Ensure the sampled goals are within the environment's state bounds
             goals = torch.clamp(goals, min=min_bounds, max=max_bounds)
 
+            # print(f"Goals input shape in forward: {goals.shape}")
+            # print(f'State input shape from forward: {state.shape}')
             states, delta_vars, delta_means = self.perform_rollout(state, goals)
 
             returns = torch.zeros(self.n_candidates).float().to(self.device)
@@ -108,6 +110,7 @@ class HighLevelPlanner(nn.Module):
         delta_means = [torch.empty(0)] * T
         delta_vars = [torch.empty(0)] * T
 
+        # print(f"Current state shape in perform_rollout: {current_state.shape}")
         # Prepare the initial state tensor
         current_state = current_state.unsqueeze(dim=0).unsqueeze(dim=0)
         current_state = current_state.repeat(self.ensemble_size, self.n_candidates, 1)

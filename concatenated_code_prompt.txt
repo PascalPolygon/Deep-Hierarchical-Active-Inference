@@ -31,7 +31,7 @@ class Buffer(object):
         normalizer,
         context_length,
         signal_noise=None,
-        buffer_size=10 ** 6,
+        buffer_size=10 ** 3,
         device="cpu",
     ):
         self.state_size = state_size
@@ -74,14 +74,23 @@ class Buffer(object):
             next_goal (np.ndarray): The next goal after the action.
         """
         idx = self._total_steps % self.buffer_size
+        # print(f"Type of state: {type(state)}")
+        # print(f"Type of goal: {type(goal)}")
+        # print(f"Type of action: {type(action)}")
+        # print(f"Type of reward: {type(reward)}")
+        # print(f"Type of next_state: {type(next_state)}")
+        # print(f"Type of next_goal: {type(next_goal)}")
+
         state_delta = next_state - state
 
+        print(f"Action shape: {action.shape}")
         self.low_level_states[idx] = state
         self.low_level_actions[idx] = action
         self.low_level_rewards[idx] = reward
         self.low_level_state_deltas[idx] = state_delta
         self.low_level_goals[idx] = goal
-        self.low_level_next_goals[idx] = next_goal[0]
+        # self.low_level_next_goals[idx] = next_goal[0]
+        self.low_level_next_goals[idx] = next_goal
         self._total_steps += 1
 
         self.normalizer.update(state, action, state_delta, goal)
@@ -181,15 +190,21 @@ class Buffer(object):
             Tuple of torch.Tensor: Batches of states, goals, and actions.
         """
         size = len(self.low_level_states)
-        indices = np.random.permutation(size)
+        # print("Size of low-level states: ", size)
+        
+        # Create indices with permutation for each ensemble member
+        indices = [
+            np.random.permutation(range(size)) for _ in range(self.ensemble_size)
+        ]
+        indices = np.stack(indices).T
 
         for i in range(0, size, batch_size):
             j = min(size, i + batch_size)
             if (j - i) < batch_size and i != 0:
                 return
 
-            batch_indices = indices[i:j]
             batch_size = j - i
+            batch_indices = indices[i:j].flatten()  # Flattening the batch indices
 
             # Fetch and convert to tensors
             states = torch.from_numpy(self.low_level_states[batch_indices]).float().to(self.device)
@@ -203,6 +218,7 @@ class Buffer(object):
 
             yield states, goals, actions
 
+
     def get_high_level_train_batches(self, batch_size):
         """
         Get batches of high-level experiences for training.
@@ -214,15 +230,21 @@ class Buffer(object):
             Tuple of torch.Tensor: Batches of states, goals, rewards, and state deltas.
         """
         size = len(self.high_level_states)
-        indices = np.random.permutation(size)
+        # print("Size of high level states: ", size)
+        
+        # Create indices with permutation for each ensemble member
+        indices = [
+            np.random.permutation(range(size)) for _ in range(self.ensemble_size)
+        ]
+        indices = np.stack(indices).T
 
         for i in range(0, size, batch_size):
             j = min(size, i + batch_size)
             if (j - i) < batch_size and i != 0:
                 return
 
-            batch_indices = indices[i:j]
             batch_size = j - i
+            batch_indices = indices[i:j].flatten()  # Flattening the batch indices
 
             # Fetch high-level data and convert to tensors
             states = torch.from_numpy(np.array(self.high_level_states)[batch_indices]).float().to(self.device)
@@ -230,13 +252,18 @@ class Buffer(object):
             rewards = torch.from_numpy(np.array(self.high_level_rewards)[batch_indices]).float().to(self.device)
             goal_deltas = torch.from_numpy(np.array(self.high_level_next_states)[batch_indices] - np.array(self.high_level_states)[batch_indices]).float().to(self.device)
 
+            if self.signal_noise is not None:
+                states = states + self.signal_noise * torch.randn_like(states)
+            
             # Reshape for ensemble processing
+            # print("States before reshaping: ", states.shape)
             states = states.reshape(self.ensemble_size, batch_size, self.state_size)
             goals = goals.reshape(self.ensemble_size, batch_size, self.goal_size)
             rewards = rewards.reshape(self.ensemble_size, batch_size, 1)
             goal_deltas = goal_deltas.reshape(self.ensemble_size, batch_size, self.state_size)
 
             yield states, goals, rewards, goal_deltas
+
 
     def __len__(self):
         return min(self._total_steps, self.buffer_size)
@@ -1462,6 +1489,8 @@ class HighLevelPlanner(nn.Module):
             # Ensure the sampled goals are within the environment's state bounds
             goals = torch.clamp(goals, min=min_bounds, max=max_bounds)
 
+            print(f"Goals shape in forward: {goals.shape}")
+
             states, delta_vars, delta_means = self.perform_rollout(state, goals)
 
             returns = torch.zeros(self.n_candidates).float().to(self.device)
@@ -1627,7 +1656,11 @@ class LowLevelPlanner(nn.Module):
         # Calculate the reward as the negative distance to the goal
         reward = -torch.norm(predicted_next_state - goal, p=2, dim=-1).mean()
 
+        # To return a single action, take the mean of the actions across the ensemble
+        action = action.mean(dim=0).squeeze(dim=0)
+
         return action, reward
+
 
     def perform_rollout(self, current_state, goal):
         """
@@ -1876,6 +1909,7 @@ class HierarchicalAgent(object):
         Returns:
             Buffer: The buffer filled with seed episodes.
         """
+        print(f"Collecting {n_episodes} seed episodes.")
         for episode in range(n_episodes):
             state = self.env.reset()
             done = False
@@ -1916,9 +1950,14 @@ class HierarchicalAgent(object):
                 state = deepcopy(next_state)
                 step += 1
 
+                if done:
+                    break
+
             if self.logger:
                 self.logger.log(f"Episode {episode+1}/{n_episodes} complete.")
-
+        print (f"Buffer size: {len(buffer)}")
+        print(f'Step count: {buffer._total_steps}')
+        print(f"High-level goals: {len(buffer.high_level_goals)}")
         return buffer
 
     def run_episode(self, buffer=None, action_noise=None, recorder=None):
@@ -1944,12 +1983,14 @@ class HierarchicalAgent(object):
             while not done:
                 if step % self.context_length == 0:
                     self.current_goal = self.high_level_planner(state)
+                    print(f"Goal from high-level planner: {self.current_goal.shape}")
                     self.logger.log("New context")
                     if self.logger:
                         self.logger.log(f"New high-level goal sampled at step {step}: {self.current_goal}")
 
                     if step > 0:
                         corrected_goal = self.off_policy_goal_correction(buffer, state, exploration_scale=self.high_level_planner.expl_scale)
+                        #TODO: Could we update high_level action density based on the corrected goal?
                         buffer.update(corrected_goal)
                         if self.logger:
                             self.logger.log(f"High-level transition updated with corrected goal: {corrected_goal}")
@@ -1963,14 +2004,16 @@ class HierarchicalAgent(object):
 
                 # if not isinstance(self.current_goal, torch.Tensor):
                 #     self.current_goal = torch.from_numpy(self.current_goal).float().to(self.device)
-                if not isinstance(state, torch.Tensor):
-                    state = torch.from_numpy(state).float().to(self.device)
+                # if not isinstance(state, torch.Tensor):
+                #     state = torch.from_numpy(state).float().to(self.device)
+                if not isinstance(self.current_goal, np.ndarray):
+                    self.current_goal = np.array(self.current_goal)
 
                 self.next_goal = state + self.current_goal - next_state
                 total_reward += reward
                 total_steps += 1
 
-                if self.logger:
+                if self.logger: 
                     self.logger.log(f"Step {step}: state={state}, goal={self.current_goal}, action={action}, reward={reward}, next_state={next_state}, next_goal={self.next_goal}")
 
                 if self.logger and total_steps % 25 == 0:
@@ -1978,7 +2021,7 @@ class HierarchicalAgent(object):
 
                 if buffer is not None:
                     # self.logger.log(f"Action: {action}")
-                    buffer.add(deepcopy(state), deepcopy(self.current_goal), action[0], reward + low_level_reward, deepcopy(next_state), deepcopy(self.next_goal))
+                    buffer.add(deepcopy(state), deepcopy(self.current_goal), action, reward, deepcopy(next_state), deepcopy(self.next_goal))
                     # if self.logger:
                     #     self.logger.log(f"Low-level transition added: state={state}, goal={self.current_goal}, action={action}, reward={reward + low_level_reward}, next_state={next_state}, next_goal={self.next_goal}")
 
@@ -2033,27 +2076,40 @@ class HierarchicalAgent(object):
         state = torch.from_numpy(state).float().to(self.device)
         candidate_goals = []
 
-        candidate_goals.append(self.current_goal)
-        candidate_goals.append(buffer.high_level_next_states[-1] - buffer.high_level_states[-1])
+        # Ensure that current_goal is a torch.Tensor
+        if not isinstance(self.current_goal, torch.Tensor):
+            self.current_goal = torch.tensor(self.current_goal, dtype=torch.float32, device=self.device)
 
-        mean = buffer.high_level_next_states[-1] - buffer.high_level_states[-1]
+        candidate_goals.append(self.current_goal)
+        candidate_goals.append(torch.tensor(buffer.high_level_next_states[-1] - buffer.high_level_states[-1], dtype=torch.float32, device=self.device))
+
+        mean = candidate_goals[1]
         std_dev = 0.5 * torch.std(self.current_goal).item() * torch.ones_like(mean)
         for _ in range(8):
             sampled_goal = torch.normal(mean, std_dev).to(self.device)
             candidate_goals.append(sampled_goal)
 
-        candidate_goals = [torch.clamp(goal, min=self.env.observation_space.low, max=self.env.observation_space.high) for goal in candidate_goals]
+        # Convert numpy arrays to torch tensors
+        obs_low = torch.tensor(self.env.observation_space.low, dtype=torch.float32, device=self.device)
+        obs_high = torch.tensor(self.env.observation_space.high, dtype=torch.float32, device=self.device)
+
+        # Ensure all candidate goals are torch tensors and clamp them
+        candidate_goals = [torch.clamp(goal, min=obs_low, max=obs_high) for goal in candidate_goals]
+
+        # Expand goals to match the number of candidates in states
+        candidate_goals = torch.stack(candidate_goals)
+        candidate_goals = candidate_goals.unsqueeze(1).expand(-1, state.size(1), -1)
 
         best_goal = None
         best_objective = float('-inf')
         for candidate_goal in candidate_goals:
             log_prob = 0
             for i in range(len(buffer.low_level_actions)):
-                action = buffer.low_level_actions[i]
+                action = torch.tensor(buffer.low_level_actions[i], dtype=torch.float32, device=self.device)  # Convert action to torch.Tensor
                 predicted_action = self.low_level_planner(buffer.low_level_states[i], candidate_goal)
                 log_prob += -0.5 * torch.norm(action - predicted_action[0], p=2).item() ** 2
 
-            if use_exploration and self.exploration_measure is not None:
+            if use_exploration is not None:
                 delta_means, delta_vars = self.high_level_planner.perform_rollout(state, candidate_goal.unsqueeze(0))
                 exploration_bonus = self.high_level_planner.measure(delta_means, delta_vars).sum().item()
             else:
@@ -2069,6 +2125,9 @@ class HierarchicalAgent(object):
             self.logger.log(f"Off-policy goal correction: Selected goal={best_goal} with objective={best_objective}")
 
         return best_goal
+
+
+
 
 
 

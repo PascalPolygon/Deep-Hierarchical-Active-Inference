@@ -57,7 +57,11 @@ class LowLevelPlanner(nn.Module):
         # Calculate the reward as the negative distance to the goal
         reward = -torch.norm(predicted_next_state - goal, p=2, dim=-1).mean()
 
+        # To return a single action, take the mean of the actions across the ensemble
+        action = action.mean(dim=0).squeeze(dim=0)
+
         return action, reward
+
 
     def perform_rollout(self, current_state, goal):
         """

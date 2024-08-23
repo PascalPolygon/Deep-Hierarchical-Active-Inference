@@ -174,8 +174,8 @@ class EnsembleModel(nn.Module):
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: Mean and variance of the state deltas.
         """
-        print(f'states.shape: {states.shape}')
-        print(f'goals.shape: {goals.shape}')
+        # print(f'states.shape: {states.shape}')
+        # print(f'goals.shape: {goals.shape}')
         inp = torch.cat((states, goals), dim=2)  # Concatenate states and goals
         op = self.fc_1(inp)  # First hidden layer
         op = self.fc_2(op)   # Second hidden layer
