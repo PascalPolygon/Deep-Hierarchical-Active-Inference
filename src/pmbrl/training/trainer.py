@@ -76,12 +76,12 @@ class HierarchicalTrainer(object):
 
             # Train low-level action model
             self._train_low_level(epoch, low_level_a_losses, n_batches_low)
-
-        return (
-            self._get_avg_loss(high_level_e_losses, n_batches_high, epoch), # high-level ensemble loss
-            self._get_avg_loss(high_level_r_losses, n_batches_high, epoch), # high-level reward loss
-            self._get_avg_loss(low_level_a_losses, n_batches_low, epoch), # low-level action model loss
-        )
+        return high_level_e_losses, high_level_r_losses, low_level_a_losses
+        # return (
+        #     self._get_avg_loss(high_level_e_losses, n_batches_high, epoch), # high-level ensemble loss
+        #     self._get_avg_loss(high_level_r_losses, n_batches_high, epoch), # high-level reward loss
+        #     self._get_avg_loss(low_level_a_losses, n_batches_low, epoch), # low-level action model loss
+        # )
 
     def _train_high_level(self, epoch, e_losses, r_losses, n_batches):
         """
@@ -133,7 +133,7 @@ class HierarchicalTrainer(object):
             a_losses (list): List to store action model losses.
             n_batches (list): List to store the number of batches per epoch.
         """
-        for (states, goals, next_states) in self.buffer.get_low_level_train_batches(self.batch_size):
+        for (states, goals, _s) in self.buffer.get_low_level_train_batches(self.batch_size):
             self.low_level_action.train()
 
             # Zero the gradients for the low-level action model

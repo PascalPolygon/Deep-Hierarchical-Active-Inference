@@ -68,7 +68,7 @@ class Buffer(object):
 
         state_delta = next_state - state
 
-        print(f"Action shape: {action.shape}")
+        # print(f"Action shape: {action.shape}")
         self.low_level_states[idx] = state
         self.low_level_actions[idx] = action
         self.low_level_rewards[idx] = reward

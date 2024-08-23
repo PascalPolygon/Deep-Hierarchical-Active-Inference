@@ -148,8 +148,8 @@ class HierarchicalAgent(object):
                 total_reward += reward
                 total_steps += 1
 
-                if self.logger: 
-                    self.logger.log(f"Step {step}: state={state}, goal={self.current_goal}, action={action}, reward={reward}, next_state={next_state}, next_goal={self.next_goal}")
+                # if self.logger: 
+                #     self.logger.log(f"Step {step}: state={state}, goal={self.current_goal}, action={action}, reward={reward}, next_state={next_state}, next_goal={self.next_goal}")
 
                 if self.logger and total_steps % 25 == 0:
                     self.logger.log(f"Progress log - Total steps: {total_steps}, Total reward: {total_reward}")

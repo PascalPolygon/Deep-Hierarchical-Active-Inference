@@ -1,4 +1,4 @@
-02:35:56
+10:38:13
 
 === Loading experiment [device: cpu] ===
 
@@ -8,7 +8,7 @@
  'batch_size': 50,
  'context_length': 7,
  'coverage': False,
- 'ensemble_size': 25,
+ 'ensemble_size': 5,
  'env_name': 'SparseMountainCar',
  'epsilon': 1e-08,
  'expl_scale': 1.0,
@@ -17,11 +17,11 @@
  'hidden_size': 200,
  'learning_rate': 0.001,
  'logdir': 'log',
- 'max_episode_len': 500,
+ 'max_episode_len': 5,
  'n_candidates': 500,
- 'n_episodes': 50,
+ 'n_episodes': 5,
  'n_seed_episodes': 1,
- 'n_train_epochs': 100,
+ 'n_train_epochs': 1,
  'optimisation_iters': 5,
  'plan_horizon': 30,
  'record_every': None,
@@ -32,176 +32,15 @@
  'use_exploration': True,
  'use_mean': False,
  'use_reward': True}
-Low-level transition added: state=[-0.58912799  0.        ], goal=[-0.58373691  0.00268558], action=[0.27716056], reward=0, next_state=[-0.58373691  0.00268558], next_goal=[-0.58373691  0.00268558]
-Low-level transition added: state=[-0.58373691  0.00268558], goal=[-0.57819301  0.00141391], action=[-0.57114166], reward=0, next_state=[-0.57819301  0.00141391], next_goal=[-0.57819301  0.00141391]
-Low-level transition added: state=[-0.57819301  0.00141391], goal=[-0.58025524 -0.00173687], action=[-0.9718604], reward=0, next_state=[-0.58025524 -0.00173687], next_goal=[-0.58025524 -0.00173687]
-Low-level transition added: state=[-0.58025524 -0.00173687], goal=[-0.58318803 -0.00058931], action=[-0.03299339], reward=0, next_state=[-0.58318803 -0.00058931], next_goal=[-0.58318803 -0.00058931]
-Low-level transition added: state=[-0.58318803 -0.00058931], goal=[-0.58887841 -0.00253892], action=[-0.73682195], reward=0, next_state=[-0.58887841 -0.00253892], next_goal=[-0.58887841 -0.00253892]
-Low-level transition added: state=[-0.58887841 -0.00253892], goal=[-0.59644856 -0.00249699], action=[-0.32743445], reward=0, next_state=[-0.59644856 -0.00249699], next_goal=[-0.59644856 -0.00249699]
-Low-level transition added: state=[-0.59644856 -0.00249699], goal=[-0.59517729  0.00188638], action=[0.6100345], reward=0, next_state=[-0.59517729  0.00188638], next_goal=[-0.59517729  0.00188638]
-Low-level transition added: state=[-0.59517729  0.00188638], goal=[-0.59504565 -0.00088108], action=[-0.96691334], reward=0, next_state=[-0.59504565 -0.00088108], next_goal=[-0.59504565 -0.00088108]
-Low-level transition added: state=[-0.59504565 -0.00088108], goal=[-0.59288183  0.00152009], action=[0.18000787], reward=0, next_state=[-0.59288183  0.00152009], next_goal=[-0.59288183  0.00152009]
-Low-level transition added: state=[-0.59288183  0.00152009], goal=[-0.58099871  0.00515679], action=[0.47971827], reward=0, next_state=[-0.58099871  0.00515679], next_goal=[-0.58099871  0.00515679]
-Low-level transition added: state=[-0.58099871  0.00515679], goal=[-0.56660026  0.00458448], action=[-0.38838392], reward=0, next_state=[-0.56660026  0.00458448], next_goal=[-0.56660026  0.00458448]
-Low-level transition added: state=[-0.56660026  0.00458448], goal=[-0.55200422  0.00496992], action=[-0.10496496], reward=0, next_state=[-0.55200422  0.00496992], next_goal=[-0.55200422  0.00496992]
-Low-level transition added: state=[-0.55200422  0.00496992], goal=[-0.53888741  0.00403949], action=[-0.32572812], reward=0, next_state=[-0.53888741  0.00403949], next_goal=[-0.53888741  0.00403949]
-Low-level transition added: state=[-0.53888741  0.00403949], goal=[-0.5230815   0.00584588], action=[0.34938452], reward=0, next_state=[-0.5230815   0.00584588], next_goal=[-0.5230815   0.00584588]
-Low-level transition added: state=[-0.5230815   0.00584588], goal=[-0.50241946  0.00735821], action=[0.37149215], reward=0, next_state=[-0.50241946  0.00735821], next_goal=[-0.50241946  0.00735821]
-Low-level transition added: state=[-0.50241946  0.00735821], goal=[-0.48786994  0.00355455], action=[-0.7109719], reward=0, next_state=[-0.48786994  0.00355455], next_goal=[-0.48786994  0.00355455]
-Low-level transition added: state=[-0.48786994  0.00355455], goal=[-0.48707436 -0.00138762], action=[-0.91316664], reward=0, next_state=[-0.48707436 -0.00138762], next_goal=[-0.48707436 -0.00138762]
-Low-level transition added: state=[-0.48707436 -0.00138762], goal=[-0.48637265  0.00104595], action=[0.72152174], reward=0, next_state=[-0.48637265  0.00104595], next_goal=[-0.48637265  0.00104595]
-Low-level transition added: state=[-0.48637265  0.00104595], goal=[-0.49027034 -0.00246649], action=[-0.5973818], reward=0, next_state=[-0.49027034 -0.00246649], next_goal=[-0.49027034 -0.00246649]
-Low-level transition added: state=[-0.49027034 -0.00246649], goal=[-4.92832126e-01 -3.82295257e-05], action=[0.69902486], reward=0, next_state=[-4.92832126e-01 -3.82295257e-05], next_goal=[-4.92832126e-01 -3.82295257e-05]
-Low-level transition added: state=[-4.92832126e-01 -3.82295257e-05], goal=[-0.49038336  0.00123898], action=[0.4400964], reward=0, next_state=[-0.49038336  0.00123898], next_goal=[-0.49038336  0.00123898]
-Low-level transition added: state=[-0.49038336  0.00123898], goal=[-0.49183464 -0.00134473], action=[-0.40790525], reward=0, next_state=[-0.49183464 -0.00134473], next_goal=[-0.49183464 -0.00134473]
-Low-level transition added: state=[-0.49183464 -0.00134473], goal=[-0.5045101  -0.00563907], action=[-0.81205016], reward=0, next_state=[-0.5045101  -0.00563907], next_goal=[-0.5045101  -0.00563907]
-Low-level transition added: state=[-0.5045101  -0.00563907], goal=[-0.52521992 -0.00748583], action=[-0.34751588], reward=0, next_state=[-0.52521992 -0.00748583], next_goal=[-0.52521992 -0.00748583]
-Low-level transition added: state=[-0.52521992 -0.00748583], goal=[-0.55086207 -0.00901585], action=[-0.38923264], reward=0, next_state=[-0.55086207 -0.00901585], next_goal=[-0.55086207 -0.00901585]
-Low-level transition added: state=[-0.55086207 -0.00901585], goal=[-0.56908016 -0.00455013], action=[0.8209784], reward=0, next_state=[-0.56908016 -0.00455013], next_goal=[-0.56908016 -0.00455013]
-Low-level transition added: state=[-0.56908016 -0.00455013], goal=[-0.5798695  -0.00309105], action=[0.07809651], reward=0, next_state=[-0.5798695  -0.00309105], next_goal=[-0.5798695  -0.00309105]
-Low-level transition added: state=[-0.5798695  -0.00309105], goal=[-0.58533329 -0.00117052], action=[0.13566862], reward=0, next_state=[-0.58533329 -0.00117052], next_goal=[-0.58533329 -0.00117052]
-Low-level transition added: state=[-0.58533329 -0.00117052], goal=[-0.59302469 -0.00324407], action=[-0.7780496], reward=0, next_state=[-0.59302469 -0.00324407], next_goal=[-0.59302469 -0.00324407]
-Low-level transition added: state=[-0.59302469 -0.00324407], goal=[-0.59110755  0.00258305], action=[0.947074], reward=0, next_state=[-0.59110755  0.00258305], next_goal=[-0.59110755  0.00258305]
-Low-level transition added: state=[-0.59110755  0.00258305], goal=[-0.58243736  0.00302279], action=[-0.22379053], reward=0, next_state=[-0.58243736  0.00302279], next_goal=[-0.58243736  0.00302279]
-Low-level transition added: state=[-0.58243736  0.00302279], goal=[-0.57349482  0.00293767], action=[-0.2967626], reward=0, next_state=[-0.57349482  0.00293767], next_goal=[-0.57349482  0.00293767]
-Low-level transition added: state=[-0.57349482  0.00293767], goal=[-0.55443084  0.00802212], action=[0.90727395], reward=0, next_state=[-0.55443084  0.00802212], next_goal=[-0.55443084  0.00802212]
-Low-level transition added: state=[-0.55443084  0.00802212], goal=[-0.53763632  0.00433963], action=[-0.9402056], reward=0, next_state=[-0.53763632  0.00433963], next_goal=[-0.53763632  0.00433963]
-Low-level transition added: state=[-0.53763632  0.00433963], goal=[-0.52333952  0.00494352], action=[0.08723563], reward=0, next_state=[-0.52333952  0.00494352], next_goal=[-0.52333952  0.00494352]
-Low-level transition added: state=[-0.52333952  0.00494352], goal=[-5.17407811e-01  4.73628068e-04], action=[-0.9771243], reward=0, next_state=[-5.17407811e-01  4.73628068e-04], next_goal=[-5.17407811e-01  4.73628068e-04]
-Low-level transition added: state=[-5.17407811e-01  4.73628068e-04], goal=[-0.52007472 -0.00156614], action=[-0.4245123], reward=0, next_state=[-0.52007472 -0.00156614], next_goal=[-0.52007472 -0.00156614]
-Low-level transition added: state=[-0.52007472 -0.00156614], goal=[-0.52296938 -0.00065587], action=[0.21405287], reward=0, next_state=[-0.52296938 -0.00065587], next_goal=[-0.52296938 -0.00065587]
-Low-level transition added: state=[-0.52296938 -0.00065587], goal=[-5.23680335e-01 -2.49727600e-05], action=[0.14145473], reward=0, next_state=[-5.23680335e-01 -2.49727600e-05], next_goal=[-5.23680335e-01 -2.49727600e-05]
-Low-level transition added: state=[-5.23680335e-01 -2.49727600e-05], goal=[-0.52806965 -0.00217386], action=[-0.48287863], reward=0, next_state=[-0.52806965 -0.00217386], next_goal=[-0.52806965 -0.00217386]
-Low-level transition added: state=[-0.52806965 -0.00217386], goal=[-0.52585533  0.00219401], action=[0.94711965], reward=0, next_state=[-0.52585533  0.00219401], next_goal=[-0.52585533  0.00219401]
-Low-level transition added: state=[-0.52585533  0.00219401], goal=[-0.51650427  0.00355679], action=[0.30566302], reward=0, next_state=[-0.51650427  0.00355679], next_goal=[-0.51650427  0.00355679]
-Low-level transition added: state=[-0.51650427  0.00355679], goal=[-0.50202968  0.00542498], action=[0.47271517], reward=0, next_state=[-0.50202968  0.00542498], next_goal=[-0.50202968  0.00542498]
-Low-level transition added: state=[-0.50202968  0.00542498], goal=[-0.47816676  0.00916406], action=[0.9742556], reward=0, next_state=[-0.47816676  0.00916406], next_goal=[-0.47816676  0.00916406]
-Low-level transition added: state=[-0.47816676  0.00916406], goal=[-0.44774088  0.01055744], action=[0.58473676], reward=0, next_state=[-0.44774088  0.01055744], next_goal=[-0.44774088  0.01055744]
-Low-level transition added: state=[-0.44774088  0.01055744], goal=[-0.4145534   0.01123549], action=[0.57961524], reward=0, next_state=[-0.4145534   0.01123549], next_goal=[-0.4145534   0.01123549]
-Low-level transition added: state=[-0.4145534   0.01123549], goal=[-0.38977975  0.00670554], action=[-0.42748654], reward=0, next_state=[-0.38977975  0.00670554], next_goal=[-0.38977975  0.00670554]
-Low-level transition added: state=[-0.38977975  0.00670554], goal=[-0.37430393  0.004347  ], action=[0.15320146], reward=0, next_state=[-0.37430393  0.004347  ], next_goal=[-0.37430393  0.004347  ]
-Low-level transition added: state=[-0.37430393  0.004347  ], goal=[-3.69474551e-01  2.25677693e-04], action=[-0.18270846], reward=0, next_state=[-3.69474551e-01  2.25677693e-04], next_goal=[-3.69474551e-01  2.25677693e-04]
-Low-level transition added: state=[-3.69474551e-01  2.25677693e-04], goal=[-0.38251162 -0.0066097 ], action=[-0.7882463], reward=0, next_state=[-0.38251162 -0.0066097 ], next_goal=[-0.38251162 -0.0066097 ]
-Low-level transition added: state=[-0.38251162 -0.0066097 ], goal=[-0.40165267 -0.00622113], action=[0.7411525], reward=0, next_state=[-0.40165267 -0.00622113], next_goal=[-0.40165267 -0.00622113]
-Low-level transition added: state=[-0.40165267 -0.00622113], goal=[-0.42157627 -0.00680496], action=[0.43582016], reward=0, next_state=[-0.42157627 -0.00680496], next_goal=[-0.42157627 -0.00680496]
-Low-level transition added: state=[-0.42157627 -0.00680496], goal=[-0.44000917 -0.00576842], action=[0.7019147], reward=0, next_state=[-0.44000917 -0.00576842], next_goal=[-0.44000917 -0.00576842]
-Low-level transition added: state=[-0.44000917 -0.00576842], goal=[-0.46170845 -0.00791511], action=[-0.09639993], reward=0, next_state=[-0.46170845 -0.00791511], next_goal=[-0.46170845 -0.00791511]
-Low-level transition added: state=[-0.46170845 -0.00791511], goal=[-0.48226724 -0.00626898], action=[0.6378099], reward=0, next_state=[-0.48226724 -0.00626898], next_goal=[-0.48226724 -0.00626898]
-Low-level transition added: state=[-0.48226724 -0.00626898], goal=[-0.50668624 -0.00901755], action=[-0.4421929], reward=0, next_state=[-0.50668624 -0.00901755], next_goal=[-0.50668624 -0.00901755]
-Low-level transition added: state=[-0.50668624 -0.00901755], goal=[-0.52970488 -0.00694028], action=[0.5053903], reward=0, next_state=[-0.52970488 -0.00694028], next_goal=[-0.52970488 -0.00694028]
-Low-level transition added: state=[-0.52970488 -0.00694028], goal=[-0.54747438 -0.00536814], action=[0.2874153], reward=0, next_state=[-0.54747438 -0.00536814], next_goal=[-0.54747438 -0.00536814]
-Low-level transition added: state=[-0.54747438 -0.00536814], goal=[-0.55492315 -0.00101628], action=[0.8305653], reward=0, next_state=[-0.55492315 -0.00101628], next_goal=[-0.55492315 -0.00101628]
-Low-level transition added: state=[-0.55492315 -0.00101628], goal=[-5.54882959e-01  5.30066623e-04], action=[0.1855932], reward=0, next_state=[-5.54882959e-01  5.30066623e-04], next_goal=[-5.54882959e-01  5.30066623e-04]
-Low-level transition added: state=[-5.54882959e-01  5.30066623e-04], goal=[-0.54315611  0.00557541], action=[0.97891676], reward=0, next_state=[-0.54315611  0.00557541], next_goal=[-0.54315611  0.00557541]
-Low-level transition added: state=[-0.54315611  0.00557541], goal=[-0.52667738  0.00541019], action=[-0.10675673], reward=0, next_state=[-0.52667738  0.00541019], next_goal=[-0.52667738  0.00541019]
-Low-level transition added: state=[-0.52667738  0.00541019], goal=[-0.51640993  0.00239912], action=[-0.66400975], reward=0, next_state=[-0.51640993  0.00239912], next_goal=[-0.51640993  0.00239912]
-Low-level transition added: state=[-0.51640993  0.00239912], goal=[-0.5122829   0.00085168], action=[-0.29931983], reward=0, next_state=[-0.5122829   0.00085168], next_goal=[-0.5122829   0.00085168]
-Low-level transition added: state=[-0.5122829   0.00085168], goal=[-5.11166463e-01  1.28678650e-04], action=[-0.10142832], reward=0, next_state=[-5.11166463e-01  1.28678650e-04], next_goal=[-5.11166463e-01  1.28678650e-04]
-Low-level transition added: state=[-5.11166463e-01  1.28678650e-04], goal=[-0.50874454  0.00114183], action=[0.2902067], reward=0, next_state=[-0.50874454  0.00114183], next_goal=[-0.50874454  0.00114183]
-Low-level transition added: state=[-0.50874454  0.00114183], goal=[-0.51396522 -0.00317358], action=[-0.88864595], reward=0, next_state=[-0.51396522 -0.00317358], next_goal=[-0.51396522 -0.00317358]
-Low-level transition added: state=[-0.51396522 -0.00317358], goal=[-0.53013452 -0.00646145], action=[-0.70582664], reward=0, next_state=[-0.53013452 -0.00646145], next_goal=[-0.53013452 -0.00646145]
-Low-level transition added: state=[-0.53013452 -0.00646145], goal=[-0.54690953 -0.00511308], action=[0.2374509], reward=0, next_state=[-0.54690953 -0.00511308], next_goal=[-0.54690953 -0.00511308]
-Low-level transition added: state=[-0.54690953 -0.00511308], goal=[-0.56419124 -0.00604233], action=[-0.3506996], reward=0, next_state=[-0.56419124 -0.00604233], next_goal=[-0.56419124 -0.00604233]
-Low-level transition added: state=[-0.56419124 -0.00604233], goal=[-0.58800019 -0.00882772], action=[-0.85774994], reward=0, next_state=[-0.58800019 -0.00882772], next_goal=[-0.58800019 -0.00882772]
-Low-level transition added: state=[-0.58800019 -0.00882772], goal=[-0.60716847 -0.0051188 ], action=[0.46884334], reward=0, next_state=[-0.60716847 -0.0051188 ], next_goal=[-0.60716847 -0.0051188 ]
-Low-level transition added: state=[-0.60716847 -0.0051188 ], goal=[-0.62163315 -0.00463738], action=[-0.33035412], reward=0, next_state=[-0.62163315 -0.00463738], next_goal=[-0.62163315 -0.00463738]
-Low-level transition added: state=[-0.62163315 -0.00463738], goal=[-0.62503063  0.00063439], action=[0.6773347], reward=0, next_state=[-0.62503063  0.00063439], next_goal=[-0.62503063  0.00063439]
-Low-level transition added: state=[-0.62503063  0.00063439], goal=[-0.62053257  0.00192261], action=[-0.20729133], reward=0, next_state=[-0.62053257  0.00192261], next_goal=[-0.62053257  0.00192261]
-Low-level transition added: state=[-0.62053257  0.00192261], goal=[-0.60887771  0.00484157], action=[0.18636984], reward=0, next_state=[-0.60887771  0.00484157], next_goal=[-0.60887771  0.00484157]
-Low-level transition added: state=[-0.60887771  0.00484157], goal=[-0.58848143  0.00773119], action=[0.25034913], reward=0, next_state=[-0.58848143  0.00773119], next_goal=[-0.58848143  0.00773119]
-Low-level transition added: state=[-0.58848143  0.00773119], goal=[-0.56695509  0.00684334], action=[-0.483289], reward=0, next_state=[-0.56695509  0.00684334], next_goal=[-0.56695509  0.00684334]
-Low-level transition added: state=[-0.56695509  0.00684334], goal=[-0.5492698  0.0053751], action=[-0.51146716], reward=0, next_state=[-0.5492698  0.0053751], next_goal=[-0.5492698  0.0053751]
-Low-level transition added: state=[-0.5492698  0.0053751], goal=[-0.53691685  0.00345563], action=[-0.5320506], reward=0, next_state=[-0.53691685  0.00345563], next_goal=[-0.53691685  0.00345563]
-Low-level transition added: state=[-0.53691685  0.00345563], goal=[-0.53193797  0.00074576], action=[-0.65743476], reward=0, next_state=[-0.53193797  0.00074576], next_goal=[-0.53193797  0.00074576]
-Low-level transition added: state=[-0.53193797  0.00074576], goal=[-5.31443709e-01 -1.28084132e-04], action=[-0.23408058], reward=0, next_state=[-5.31443709e-01 -1.28084132e-04], next_goal=[-5.31443709e-01 -1.28084132e-04]
-Low-level transition added: state=[-5.31443709e-01 -1.28084132e-04], goal=[-0.52672783  0.00241335], action=[0.53058916], reward=0, next_state=[-0.52672783  0.00241335], next_goal=[-0.52672783  0.00241335]
-Low-level transition added: state=[-0.52672783  0.00241335], goal=[-0.51784282  0.00321457], action=[0.17635608], reward=0, next_state=[-0.51784282  0.00321457], next_goal=[-0.51784282  0.00321457]
-Low-level transition added: state=[-0.51784282  0.00321457], goal=[-0.51581144 -0.00060146], action=[-0.811584], reward=0, next_state=[-0.51581144 -0.00060146], next_goal=[-0.51581144 -0.00060146]
-Low-level transition added: state=[-0.51581144 -0.00060146], goal=[-5.15477357e-01  4.68271399e-04], action=[0.27601779], reward=0, next_state=[-5.15477357e-01  4.68271399e-04], next_goal=[-5.15477357e-01  4.68271399e-04]
-Low-level transition added: state=[-5.15477357e-01  4.68271399e-04], goal=[-0.50770339  0.00363734], action=[0.7542959], reward=0, next_state=[-0.50770339  0.00363734], next_goal=[-0.50770339  0.00363734]
-Low-level transition added: state=[-0.50770339  0.00363734], goal=[-0.50016049  0.00193177], action=[-0.28508788], reward=0, next_state=[-0.50016049  0.00193177], next_goal=[-0.50016049  0.00193177]
-Low-level transition added: state=[-0.50016049  0.00193177], goal=[-0.49499189  0.00160509], action=[0.05347338], reward=0, next_state=[-0.49499189  0.00160509], next_goal=[-0.49499189  0.00160509]
-Low-level transition added: state=[-0.49499189  0.00160509], goal=[-0.49165055  0.00085885], action=[-0.01658368], reward=0, next_state=[-0.49165055  0.00085885], next_goal=[-0.49165055  0.00085885]
-Low-level transition added: state=[-0.49165055  0.00085885], goal=[-0.49937099 -0.00427678], action=[-0.9889038], reward=0, next_state=[-0.49937099 -0.00427678], next_goal=[-0.49937099 -0.00427678]
-Low-level transition added: state=[-0.49937099 -0.00427678], goal=[-5.04305519e-01 -3.11573538e-04], action=[0.98955655], reward=0, next_state=[-5.04305519e-01 -3.11573538e-04], next_goal=[-5.04305519e-01 -3.11573538e-04]
-Low-level transition added: state=[-5.04305519e-01 -3.11573538e-04], goal=[-0.50347474  0.0005702 ], action=[0.29276773], reward=0, next_state=[-0.50347474  0.0005702 ], next_goal=[-0.50347474  0.0005702 ]
-Low-level transition added: state=[-0.50347474  0.0005702 ], goal=[-0.50939166 -0.00323351], action=[-0.750351], reward=0, next_state=[-0.50939166 -0.00323351], next_goal=[-0.50939166 -0.00323351]
-Low-level transition added: state=[-0.50939166 -0.00323351], goal=[-0.51813151 -0.00273065], action=[0.16760811], reward=0, next_state=[-0.51813151 -0.00273065], next_goal=[-0.51813151 -0.00273065]
-Low-level transition added: state=[-0.51813151 -0.00273065], goal=[-0.51953577  0.00067098], action=[0.7771169], reward=0, next_state=[-0.51953577  0.00067098], next_goal=[-0.51953577  0.00067098]
-Low-level transition added: state=[-0.51953577  0.00067098], goal=[-0.51183757  0.00349786], action=[0.6582242], reward=0, next_state=[-0.51183757  0.00349786], next_goal=[-0.51183757  0.00349786]
-Low-level transition added: state=[-0.51183757  0.00349786], goal=[-0.49545672  0.00640413], action=[0.72873443], reward=0, next_state=[-0.49545672  0.00640413], next_goal=[-0.49545672  0.00640413]
-Low-level transition added: state=[-0.49545672  0.00640413], goal=[-0.4802721   0.00434982], action=[-0.28844398], reward=0, next_state=[-0.4802721   0.00434982], next_goal=[-0.4802721   0.00434982]
-Low-level transition added: state=[-0.4802721   0.00434982], goal=[-0.46916098  0.00335184], action=[0.01373404], reward=0, next_state=[-0.46916098  0.00335184], next_goal=[-0.46916098  0.00335184]
-Low-level transition added: state=[-0.46916098  0.00335184], goal=[-0.45838241  0.00368718], action=[0.3628735], reward=0, next_state=[-0.45838241  0.00368718], next_goal=[-0.45838241  0.00368718]
-Low-level transition added: state=[-0.45838241  0.00368718], goal=[-0.45023776  0.00220694], action=[0.01000598], reward=0, next_state=[-0.45023776  0.00220694], next_goal=[-0.45023776  0.00220694]
-Low-level transition added: state=[-0.45023776  0.00220694], goal=[-4.48101066e-01 -4.30921282e-05], action=[-0.13022937], reward=0, next_state=[-4.48101066e-01 -4.30921282e-05], next_goal=[-4.48101066e-01 -4.30921282e-05]
-Low-level transition added: state=[-4.48101066e-01 -4.30921282e-05], goal=[-0.45077265 -0.00130927], action=[0.08992074], reward=0, next_state=[-0.45077265 -0.00130927], next_goal=[-0.45077265 -0.00130927]
-Low-level transition added: state=[-0.45077265 -0.00130927], goal=[-0.46087722 -0.00437664], action=[-0.3335642], reward=0, next_state=[-0.46087722 -0.00437664], next_goal=[-0.46087722 -0.00437664]
-Low-level transition added: state=[-0.46087722 -0.00437664], goal=[-0.48462799 -0.00963487], action=[-0.8900666], reward=0, next_state=[-0.48462799 -0.00963487], next_goal=[-0.48462799 -0.00963487]
-Low-level transition added: state=[-0.48462799 -0.00963487], goal=[-0.51598632 -0.01078488], action=[-0.11204002], reward=0, next_state=[-0.51598632 -0.01078488], next_goal=[-0.51598632 -0.01078488]
-Low-level transition added: state=[-0.51598632 -0.01078488], goal=[-0.54921302 -0.0111381 ], action=[-0.09554805], reward=0, next_state=[-0.54921302 -0.0111381 ], next_goal=[-0.54921302 -0.0111381 ]
-Low-level transition added: state=[-0.54921302 -0.0111381 ], goal=[-0.5744014  -0.00695715], action=[0.7546494], reward=0, next_state=[-0.5744014  -0.00695715], next_goal=[-0.5744014  -0.00695715]
-Low-level transition added: state=[-0.5744014  -0.00695715], goal=[-0.59554334 -0.00704031], action=[-0.30623093], reward=0, next_state=[-0.59554334 -0.00704031], next_goal=[-0.59554334 -0.00704031]
-Low-level transition added: state=[-0.59554334 -0.00704031], goal=[-0.61348067 -0.0054028 ], action=[-0.02398772], reward=0, next_state=[-0.61348067 -0.0054028 ], next_goal=[-0.61348067 -0.0054028 ]
-Low-level transition added: state=[-0.61348067 -0.0054028 ], goal=[-0.62058203 -0.00082666], action=[0.55662644], reward=0, next_state=[-0.62058203 -0.00082666], next_goal=[-0.62058203 -0.00082666]
-Low-level transition added: state=[-0.62058203 -0.00082666], goal=[-0.61088075  0.00524794], action=[0.88086665], reward=0, next_state=[-0.61088075  0.00524794], next_goal=[-0.61088075  0.00524794]
-Low-level transition added: state=[-0.61088075  0.00524794], goal=[-0.58830419  0.00861346], action=[0.34941286], reward=0, next_state=[-0.58830419  0.00861346], next_goal=[-0.58830419  0.00861346]
-Low-level transition added: state=[-0.58830419  0.00861346], goal=[-0.56303648  0.00826427], action=[-0.3571314], reward=0, next_state=[-0.56303648  0.00826427], next_goal=[-0.56303648  0.00826427]
-Low-level transition added: state=[-0.56303648  0.00826427], goal=[-0.54285883  0.00590342], action=[-0.6852052], reward=0, next_state=[-0.54285883  0.00590342], next_goal=[-0.54285883  0.00590342]
-Low-level transition added: state=[-0.54285883  0.00590342], goal=[-0.51746239  0.00968764], action=[0.7828797], reward=0, next_state=[-0.51746239  0.00968764], next_goal=[-0.51746239  0.00968764]
-Low-level transition added: state=[-0.51746239  0.00968764], goal=[-0.49405496  0.00679767], action=[-0.5692432], reward=0, next_state=[-0.49405496  0.00679767], next_goal=[-0.49405496  0.00679767]
-Low-level transition added: state=[-0.49405496  0.00679767], goal=[-0.46742536  0.00985347], action=[0.86743057], reward=0, next_state=[-0.46742536  0.00985347], next_goal=[-0.46742536  0.00985347]
-Low-level transition added: state=[-0.46742536  0.00985347], goal=[-0.44855506  0.00445534], action=[-0.88315964], reward=0, next_state=[-0.44855506  0.00445534], next_goal=[-0.44855506  0.00445534]
-Low-level transition added: state=[-0.44855506  0.00445534], goal=[-4.44420998e-01 -1.76367634e-04], action=[-0.6454647], reward=0, next_state=[-4.44420998e-01 -1.76367634e-04], next_goal=[-4.44420998e-01 -1.76367634e-04]
-Low-level transition added: state=[-4.44420998e-01 -1.76367634e-04], goal=[-0.4493344 -0.0023592], action=[-0.09851661], reward=0, next_state=[-0.4493344 -0.0023592], next_goal=[-0.4493344 -0.0023592]
-Low-level transition added: state=[-0.4493344 -0.0023592], goal=[-0.46367432 -0.00595963], action=[-0.45133752], reward=0, next_state=[-0.46367432 -0.00595963], next_goal=[-0.46367432 -0.00595963]
-Low-level transition added: state=[-0.46367432 -0.00595963], goal=[-0.48877603 -0.0095133 ], action=[-0.5291849], reward=0, next_state=[-0.48877603 -0.0095133 ], next_goal=[-0.48877603 -0.0095133 ]
-Low-level transition added: state=[-0.48877603 -0.0095133 ], goal=[-0.51019743 -0.00589603], action=[0.9379617], reward=0, next_state=[-0.51019743 -0.00589603], next_goal=[-0.51019743 -0.00589603]
-Low-level transition added: state=[-0.51019743 -0.00589603], goal=[-0.53565097 -0.00971977], action=[-0.82098895], reward=0, next_state=[-0.53565097 -0.00971977], next_goal=[-0.53565097 -0.00971977]
-Low-level transition added: state=[-0.53565097 -0.00971977], goal=[-0.55726437 -0.00588796], action=[0.75095063], reward=0, next_state=[-0.55726437 -0.00588796], next_goal=[-0.55726437 -0.00588796]
-Low-level transition added: state=[-0.55726437 -0.00588796], goal=[-0.57224241 -0.00450604], action=[0.11266033], reward=0, next_state=[-0.57224241 -0.00450604], next_goal=[-0.57224241 -0.00450604]
-Low-level transition added: state=[-0.57224241 -0.00450604], goal=[-5.77609393e-01 -4.12107671e-04], action=[0.6540363], reward=0, next_state=[-5.77609393e-01 -4.12107671e-04], next_goal=[-5.77609393e-01 -4.12107671e-04]
-Low-level transition added: state=[-5.77609393e-01 -4.12107671e-04], goal=[-0.57037163  0.00381225], action=[0.67716783], reward=0, next_state=[-0.57037163  0.00381225], next_goal=[-0.57037163  0.00381225]
-Low-level transition added: state=[-0.57037163  0.00381225], goal=[-0.54946353  0.00850175], action=[0.8384918], reward=0, next_state=[-0.54946353  0.00850175], next_goal=[-0.54946353  0.00850175]
-Low-level transition added: state=[-0.54946353  0.00850175], goal=[-0.51616466  0.01231999], action=[0.77061063], reward=0, next_state=[-0.51616466  0.01231999], next_goal=[-0.51616466  0.01231999]
-Low-level transition added: state=[-0.51616466  0.01231999], goal=[-0.48636482  0.00866078], action=[-0.7221944], reward=0, next_state=[-0.48636482  0.00866078], next_goal=[-0.48636482  0.00866078]
-Low-level transition added: state=[-0.48636482  0.00866078], goal=[-0.47000469  0.00380299], action=[-0.8612497], reward=0, next_state=[-0.47000469  0.00380299], next_goal=[-0.47000469  0.00380299]
-Low-level transition added: state=[-0.47000469  0.00380299], goal=[-0.46253509  0.00181239], action=[-0.16104609], reward=0, next_state=[-0.46253509  0.00181239], next_goal=[-0.46253509  0.00181239]
-Low-level transition added: state=[-0.46253509  0.00181239], goal=[-0.46696354 -0.00311558], action=[-0.7933698], reward=0, next_state=[-0.46696354 -0.00311558], next_goal=[-0.46696354 -0.00311558]
-Low-level transition added: state=[-0.46696354 -0.00311558], goal=[-0.48196102 -0.00590728], action=[-0.36023498], reward=0, next_state=[-0.48196102 -0.00590728], next_goal=[-0.48196102 -0.00590728]
-Low-level transition added: state=[-0.48196102 -0.00590728], goal=[-0.50772924 -0.00987117], action=[-0.7116375], reward=0, next_state=[-0.50772924 -0.00987117], next_goal=[-0.50772924 -0.00987117]
-Low-level transition added: state=[-0.50772924 -0.00987117], goal=[-0.53028274 -0.00628017], action=[0.83565325], reward=0, next_state=[-0.53028274 -0.00628017], next_goal=[-0.53028274 -0.00628017]
-Low-level transition added: state=[-0.53028274 -0.00628017], goal=[-0.55101483 -0.00717517], action=[-0.2659248], reward=0, next_state=[-0.55101483 -0.00717517], next_goal=[-0.55101483 -0.00717517]
-Low-level transition added: state=[-0.55101483 -0.00717517], goal=[-0.57553371 -0.00861255], action=[-0.49550074], reward=0, next_state=[-0.57553371 -0.00861255], next_goal=[-0.57553371 -0.00861255]
-Low-level transition added: state=[-0.57553371 -0.00861255], goal=[-0.60582035 -0.0107651 ], action=[-0.78438795], reward=0, next_state=[-0.60582035 -0.0107651 ], next_goal=[-0.60582035 -0.0107651 ]
-Low-level transition added: state=[-0.60582035 -0.0107651 ], goal=[-0.63583274 -0.00954986], action=[-0.18648896], reward=0, next_state=[-0.63583274 -0.00954986], next_goal=[-0.63583274 -0.00954986]
-Low-level transition added: state=[-0.63583274 -0.00954986], goal=[-0.66232342 -0.00840705], action=[-0.3392833], reward=0, next_state=[-0.66232342 -0.00840705], next_goal=[-0.66232342 -0.00840705]
-Low-level transition added: state=[-0.66232342 -0.00840705], goal=[-0.68805035 -0.0086019 ], action=[-0.75579923], reward=0, next_state=[-0.68805035 -0.0086019 ], next_goal=[-0.68805035 -0.0086019 ]
-Low-level transition added: state=[-0.68805035 -0.0086019 ], goal=[-0.70807481 -0.00566442], action=[-0.16854988], reward=0, next_state=[-0.70807481 -0.00566442], next_goal=[-0.70807481 -0.00566442]
-Low-level transition added: state=[-0.70807481 -0.00566442], goal=[-0.72012278 -0.00316367], action=[-0.3396414], reward=0, next_state=[-0.72012278 -0.00316367], next_goal=[-0.72012278 -0.00316367]
-Low-level transition added: state=[-0.72012278 -0.00316367], goal=[-7.23283622e-01  1.12692724e-05], action=[-0.22843893], reward=0, next_state=[-7.23283622e-01  1.12692724e-05], next_goal=[-7.23283622e-01  1.12692724e-05]
-Low-level transition added: state=[-7.23283622e-01  1.12692724e-05], goal=[-0.71099395  0.00611997], action=[0.429113], reward=0, next_state=[-0.71099395  0.00611997], next_goal=[-0.71099395  0.00611997]
-Low-level transition added: state=[-0.71099395  0.00611997], goal=[-0.67980916  0.01247202], action=[0.5618006], reward=0, next_state=[-0.67980916  0.01247202], next_goal=[-0.67980916  0.01247202]
-Low-level transition added: state=[-0.67980916  0.01247202], goal=[-0.63477236  0.01618386], action=[0.13660622], reward=0, next_state=[-0.63477236  0.01618386], next_goal=[-0.63477236  0.01618386]
-Low-level transition added: state=[-0.63477236  0.01618386], goal=[-0.57774058  0.02029155], action=[0.45413753], reward=0, next_state=[-0.57774058  0.02029155], next_goal=[-0.57774058  0.02029155]
-Low-level transition added: state=[-0.57774058  0.02029155], goal=[-0.52221195  0.01747671], action=[-0.7998049], reward=0, next_state=[-0.52221195  0.01747671], next_goal=[-0.52221195  0.01747671]
-Low-level transition added: state=[-0.52221195  0.01747671], goal=[-0.47475672  0.01486728], action=[-0.49085662], reward=0, next_state=[-0.47475672  0.01486728], next_goal=[-0.47475672  0.01486728]
-Low-level transition added: state=[-0.47475672  0.01486728], goal=[-0.43931271  0.01019531], action=[-0.731489], reward=0, next_state=[-0.43931271  0.01019531], next_goal=[-0.43931271  0.01019531]
-Low-level transition added: state=[-0.43931271  0.01019531], goal=[-0.42087211  0.00407078], action=[-0.90779954], reward=0, next_state=[-0.42087211  0.00407078], next_goal=[-0.42087211  0.00407078]
-Low-level transition added: state=[-0.42087211  0.00407078], goal=[-0.4051374   0.00579663], action=[0.9121864], reward=0, next_state=[-0.4051374   0.00579663], next_goal=[-0.4051374   0.00579663]
-Low-level transition added: state=[-0.4051374   0.00579663], goal=[-3.99347770e-01 -2.38712746e-05], action=[-0.69842505], reward=0, next_state=[-3.99347770e-01 -2.38712746e-05], next_goal=[-3.99347770e-01 -2.38712746e-05]
-Low-level transition added: state=[-3.99347770e-01 -2.38712746e-05], goal=[-0.41284704 -0.00671391], action=[-0.8938169], reward=0, next_state=[-0.41284704 -0.00671391], next_goal=[-0.41284704 -0.00671391]
-Low-level transition added: state=[-0.41284704 -0.00671391], goal=[-0.44166626 -0.01098889], action=[-0.4476822], reward=0, next_state=[-0.44166626 -0.01098889], next_goal=[-0.44166626 -0.01098889]
-Low-level transition added: state=[-0.44166626 -0.01098889], goal=[-0.47089759 -0.00904729], action=[0.7872588], reward=0, next_state=[-0.47089759 -0.00904729], next_goal=[-0.47089759 -0.00904729]
-Low-level transition added: state=[-0.47089759 -0.00904729], goal=[-0.50131607 -0.01061194], action=[-0.13392954], reward=0, next_state=[-0.50131607 -0.01061194], next_goal=[-0.50131607 -0.01061194]
-Low-level transition added: state=[-0.50131607 -0.01061194], goal=[-0.5328917 -0.0104025], action=[0.10493334], reward=0, next_state=[-0.5328917 -0.0104025], next_goal=[-0.5328917 -0.0104025]
-Low-level transition added: state=[-0.5328917 -0.0104025], goal=[-0.56165755 -0.00910809], action=[0.19175847], reward=0, next_state=[-0.56165755 -0.00910809], next_goal=[-0.56165755 -0.00910809]
-Low-level transition added: state=[-0.56165755 -0.00910809], goal=[-0.59010831 -0.00960137], action=[-0.3460348], reward=0, next_state=[-0.59010831 -0.00960137], next_goal=[-0.59010831 -0.00960137]
-Low-level transition added: state=[-0.59010831 -0.00960137], goal=[-0.61678258 -0.00846994], action=[-0.12360874], reward=0, next_state=[-0.61678258 -0.00846994], next_goal=[-0.61678258 -0.00846994]
-Low-level transition added: state=[-0.61678258 -0.00846994], goal=[-0.63589427 -0.00989576], action=[-0.95720285], reward=0, next_state=[-0.63589427 -0.00989576], next_goal=[-0.63589427 -0.00989576]
+Low-level transition added: state=[-0.58912799  0.        ], goal=[-0.57938231  0.00485483], action=[0.7639891], reward=0, next_state=[-0.57938231  0.00485483], next_goal=[-0.57938231  0.00485483]
+Low-level transition added: state=[-0.57938231  0.00485483], goal=[-0.57250652  0.00295591], action=[-0.9009176], reward=0, next_state=[-0.57250652  0.00295591], next_goal=[-0.57250652  0.00295591]
 Episode 1/1 complete.
 
-Collected seeds: [1 episodes | 167 frames]
+Collected seeds: [1 episodes | 2 frames]
 
 === Episode 1 ===
-Training on [167/501] data points
+Training on [2/6] data points
+Ensemble loss inf / Reward Loss inf / Action Loss 0.03
+
+=== Collecting data [1] ===
+Step 0: state=[-0.40692181  0.        ], goal=[ 0.46592334 -0.03680629], action=[-0.0161878], reward=0, next_state=[-0.41218036 -0.00261997], next_goal=[ 0.47118189 -0.03418633]

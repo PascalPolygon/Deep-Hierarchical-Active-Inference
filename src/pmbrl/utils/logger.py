@@ -25,12 +25,21 @@ class Logger(object):
         f.close()
         print(string)
 
-    def log_losses(self, e_loss, r_loss, l_action_loss):
-        self.metrics["e_losses"].append(e_loss)
-        self.metrics["r_losses"].append(r_loss)
-        self.metrics["l_action_losses"].append(l_action_loss)
-        msg = "Ensemble loss {:.2f} / Reward Loss {:.2f} / Action Loss {:.2f}"
-        self.log(msg.format(e_loss, r_loss, l_action_loss))
+    # def log_losses(self, e_loss, r_loss, l_action_loss):
+    #     self.metrics["e_losses"].append(e_loss)
+    #     self.metrics["r_losses"].append(r_loss)
+    #     self.metrics["l_action_losses"].append(l_action_loss)
+    #     msg = "Ensemble loss {:.2f} / Reward Loss {:.2f} / Action Loss {:.2f}"
+    #     self.log(msg.format(e_loss, r_loss, l_action_loss))
+    
+    def log_losses(self, high_level_e_losses, high_level_r_losses, low_level_a_losses):
+        self.metrics["e_losses"].append(high_level_e_losses)
+        self.metrics["r_losses"].append(high_level_r_losses)
+        self.metrics["a_losses"].append(low_level_a_losses)
+
+        self.log("Ensemble losses: {}".format(high_level_e_losses[-1]))
+        self.log("Reward losses: {}".format(high_level_r_losses[-1]))
+        self.log("Action losses: {}".format(low_level_a_losses[-1]))
 
     def log_coverage(self, coverage):
         self.metrics["coverage"].append(coverage)
@@ -58,7 +67,36 @@ class Logger(object):
         self.log("Reward stats:\n {}".format(pprint.pformat(reward_stats)))
         self.log("Information gain stats:\n {}".format(pprint.pformat(info_stats)))
 
+    # def save(self):
+    #     self._save_json(self.metrics_path, self.metrics)
+    #     self.log("Saved _metrics_")
+
+      # Method to reshape losses before saving
+    # def _reshape_losses(self, losses):
+    #     reshaped = []
+    #     # Debugging output to inspect losses
+    #     print("losses: ", losses)
+        
+    #     for loss in losses:
+    #         print("loss: ", loss)
+        
+    #     for episode_losses in losses:
+    #         try:
+    #             # Attempt to reshape the episode losses
+    #             reshaped.append([epoch_loss[0] for epoch_loss in episode_losses])
+    #         except TypeError as e:
+    #             # Handle the error by skipping the problematic element
+    #             print(f"Skipping element due to TypeError: {e}")
+    #             continue
+                
+    #     return reshaped
+
+    
     def save(self):
+        # Reshape the e_losses and r_losses before saving
+        # self.metrics["e_losses"] = self._reshape_losses(self.metrics["e_losses"])
+        # self.metrics["r_losses"] = self._reshape_losses(self.metrics["r_losses"])
+
         self._save_json(self.metrics_path, self.metrics)
         self.log("Saved _metrics_")
 
@@ -72,11 +110,24 @@ class Logger(object):
         f.write(current_time)
         f.close()
 
+    # def _setup_metrics(self):
+    #     self.metrics = {
+    #         "e_losses": [],
+    #         "r_losses": [],
+    #         "l_action_losses": [],
+    #         "rewards": [],
+    #         "steps": [],
+    #         "times": [],
+    #         "reward_stats": [],
+    #         "info_stats": [],
+    #         "coverage": [],
+    #     }\
+
     def _setup_metrics(self):
         self.metrics = {
             "e_losses": [],
             "r_losses": [],
-            "l_action_losses": [],
+            "a_losses": [],  # Note: This should be low_level_a_losses or just a_losses for consistency
             "rewards": [],
             "steps": [],
             "times": [],
@@ -88,3 +139,4 @@ class Logger(object):
     def _save_json(self, path, obj):
         with open(path, "w") as file:
             json.dump(obj, file)
+    

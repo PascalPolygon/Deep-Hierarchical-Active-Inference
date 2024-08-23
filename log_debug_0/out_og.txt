@@ -1,0 +1,83 @@
+12:02:10
+
+=== Loading experiment [device: cpu] (0/3) ===
+
+{'action_noise': None,
+ 'action_noise_scale': 0.1,
+ 'action_repeat': 3,
+ 'batch_size': 50,
+ 'context_length': 2,
+ 'coverage': False,
+ 'ensemble_size': 10,
+ 'env_name': 'Pendulum-v0',
+ 'epsilon': 1e-08,
+ 'expl_scale': 1.0,
+ 'expl_strategy': 'information',
+ 'grad_clip_norm': 1000,
+ 'hidden_size': 64,
+ 'learning_rate': 0.001,
+ 'logdir': 'debug',
+ 'max_episode_len': 10,
+ 'n_candidates': 500,
+ 'n_episodes': 3,
+ 'n_experiments': 3,
+ 'n_seed_episodes': 5,
+ 'n_train_epochs': 200,
+ 'optimisation_iters': 5,
+ 'plan_horizon': 5,
+ 'record_every': None,
+ 'reward_scale': 1.0,
+ 'seed': 0,
+ 'strategy': 'information',
+ 'top_candidates': 50,
+ 'use_exploration': True,
+ 'use_mean': False,
+ 'use_reward': True}
+
+Collected seeds: [5 episodes | 20 frames]
+
+=== Episode 1 ===
+Training on [20/60] data points
+> High-Level Train 20 [ensemble 125.81 | reward 309.01]
+> High-Level Train 40 [ensemble 86.65 | reward 291.93]
+> High-Level Train 60 [ensemble 61.83 | reward 268.04]
+> High-Level Train 80 [ensemble 46.13 | reward 240.59]
+> High-Level Train 100 [ensemble 35.45 | reward 215.41]
+> High-Level Train 120 [ensemble 27.71 | reward 193.71]
+> High-Level Train 140 [ensemble 21.85 | reward 175.24]
+> High-Level Train 160 [ensemble 17.22 | reward 159.74]
+> High-Level Train 180 [ensemble 13.46 | reward 146.74]
+> High-Level Train 200 [ensemble 10.31 | reward 135.81]
+Ensemble loss 10.31 / Reward Loss 135.81
+
+=== Collecting data [1] ===
+Rewards -89.06 / Steps 4.00
+Reward stats:
+ {'max': '-56.75', 'mean': '-73.55', 'min': '-110.99', 'std': '9.35'}
+Information gain stats:
+ {'max': '6.43', 'mean': '1.79', 'min': '-4.16', 'std': '1.23'}
+Episode time 0.74
+Saved _metrics_
+
+=== Episode 2 ===
+Training on [24/72] data points
+> High-Level Train 20 [ensemble 118.31 | reward 333.80]
+> High-Level Train 40 [ensemble 80.21 | reward 307.77]
+> High-Level Train 60 [ensemble 56.31 | reward 276.01]
+> High-Level Train 80 [ensemble 41.17 | reward 244.64]
+> High-Level Train 100 [ensemble 31.08 | reward 217.82]
+> High-Level Train 120 [ensemble 23.85 | reward 195.13]
+> High-Level Train 140 [ensemble 18.38 | reward 175.91]
+> High-Level Train 160 [ensemble 14.05 | reward 159.80]
+> High-Level Train 180 [ensemble 10.51 | reward 146.37]
+> High-Level Train 200 [ensemble 7.53 | reward 135.15]
+Ensemble loss 7.53 / Reward Loss 135.15
+
+=== Collecting data [2] ===
+Rewards -5.81 / Steps 4.00
+Reward stats:
+ {'max': '-19.94', 'mean': '-33.94', 'min': '-64.22', 'std': '6.20'}
+Information gain stats:
+ {'max': '6.83', 'mean': '2.43', 'min': '-2.45', 'std': '1.31'}
+Episode time 0.67
+Saved _metrics_
