@@ -2,6 +2,8 @@ from copy import deepcopy
 import numpy as np
 import torch
 import torch.nn as nn
+from PIL import Image
+import os
 
 # TODO: Ensure we're only using torch tensors and not numpy arrays
 class HierarchicalAgent(object):
@@ -96,19 +98,16 @@ class HierarchicalAgent(object):
     def run_episode(self, buffer=None, action_noise=None, recorder=None):
         """
         Run a single episode in the environment, using the hierarchical planners.
-
-        Args:
-            buffer (Buffer, optional): The buffer to store experiences.
-            action_noise (float, optional): Noise added to the actions for exploration.
-            recorder (VideoRecorder, optional): Recorder for capturing video of the episode.
-
-        Returns:
-            Tuple: Total reward, total steps, and statistics from the episode.
         """
         total_reward = 0
         total_steps = 0
         done = False
         step = 0
+
+        # Prepare folder for saving frames
+        if recorder is not None:
+            folder_name = os.path.splitext(recorder.path)[0]  # Remove extension from video path
+            os.makedirs(folder_name, exist_ok=True)  # Create folder with the same name as the video file
 
         with torch.no_grad():
             state = self.env.reset()
@@ -116,20 +115,11 @@ class HierarchicalAgent(object):
             while not done:
                 if step % self.context_length == 0:
                     self.current_goal = self.high_level_planner(state)
-                    # print(f"Goal from high-level planner: {self.current_goal.shape}")
-                    # self.logger.log("New context")
-                    # if self.logger:
-                    #     self.logger.log(f"New high-level goal sampled at step {step}: {self.current_goal}")
 
                     if step > 0:
                         corrected_goal = self.off_policy_goal_correction(buffer, state, exploration_scale=self.high_level_planner.expl_scale)
-                        #TODO: Could we update high_level action density based on the corrected goal?
                         buffer.update(corrected_goal)
-                        # if self.logger:
-                        #     self.logger.log(f"High-level transition updated with corrected goal: {corrected_goal}")
 
-                # print(f"Low level state: {state.shape}")
-                # print(f"Low level goal: {self.current_goal.shape}")
                 action, low_level_reward = self.low_level_planner(state, self.current_goal)
                 if action_noise is not None:
                     action = self._add_action_noise(action, action_noise)
@@ -137,10 +127,6 @@ class HierarchicalAgent(object):
 
                 next_state, reward, done, _ = self.env.step(action)
 
-                # if not isinstance(self.current_goal, torch.Tensor):
-                #     self.current_goal = torch.from_numpy(self.current_goal).float().to(self.device)
-                # if not isinstance(state, torch.Tensor):
-                #     state = torch.from_numpy(state).float().to(self.device)
                 if not isinstance(self.current_goal, np.ndarray):
                     self.current_goal = np.array(self.current_goal)
 
@@ -148,21 +134,21 @@ class HierarchicalAgent(object):
                 total_reward += reward
                 total_steps += 1
 
-                # if self.logger: 
-                #     self.logger.log(f"Step {step}: state={state}, goal={self.current_goal}, action={action}, reward={reward}, next_state={next_state}, next_goal={self.next_goal}")
-
-                if self.logger and total_steps % 25 == 0:
-                    self.logger.log(f"Progress log - Total steps: {total_steps}, Total reward: {total_reward}")
-
                 if buffer is not None:
-                    # self.logger.log(f"Action: {action}")
                     buffer.add(deepcopy(state), deepcopy(self.current_goal), action, reward, deepcopy(next_state), deepcopy(self.next_goal))
-                    # if self.logger:
-                    #     self.logger.log(f"Low-level transition added: state={state}, goal={self.current_goal}, action={action}, reward={reward + low_level_reward}, next_state={next_state}, next_goal={self.next_goal}")
 
                 if recorder is not None:
+                    # Capture the frame for video
                     print(f"Recording frame {step}")
                     recorder.capture_frame()
+
+                    # Save the frame as an individual image
+                    frame = self.env.render(mode="rgb_array")  # Get the frame as an RGB array
+                    if frame is not None:
+                        img = Image.fromarray(frame)
+                        img.save(f"{folder_name}/frame_{step}.png")  # Save the image
+                    else:
+                        print(f"Warning: Frame {step} could not be rendered.")
 
                 state = deepcopy(next_state)
                 self.current_goal = deepcopy(self.next_goal)
@@ -180,7 +166,7 @@ class HierarchicalAgent(object):
             if self.logger:
                 self.logger.log(f"Episode complete. Total reward: {total_reward}, Total steps: {total_steps}")
             return total_reward, total_steps, stats
-
+        
     def _add_action_noise(self, action, noise):
         """
         Add noise to the actions for exploration.

@@ -137,6 +137,9 @@ class Buffer(object):
             batch_indices = indices[i:j]
             batch_indices = batch_indices.flatten()
 
+            # Even if we are shuffling the indices, we are still matching the indices to the correct data for staters, actions, rewards, state_deltas, and goals
+            # This works because the indices are shuffled in the same way for all the data
+            #And we model the as a POMDP, so we only care about the current state, action, reward, and next state (state_delta in this case)
             states = self.low_level_states[batch_indices]
             actions = self.low_level_actions[batch_indices]
             rewards = self.low_level_rewards[batch_indices]

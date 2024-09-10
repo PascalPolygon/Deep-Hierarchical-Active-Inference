@@ -96,7 +96,7 @@ class DebugConfig(Config):
         self.hidden_size = 64
         self.plan_horizon = 5
         self.context_length = 2
-        self.record_every = 1
+        self.record_every = 0  # Record every episode for debugging
 
 
 class MountainCarConfig(Config):
