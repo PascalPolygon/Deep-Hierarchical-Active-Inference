@@ -161,6 +161,7 @@ class HierarchicalAgent(object):
                     #     self.logger.log(f"Low-level transition added: state={state}, goal={self.current_goal}, action={action}, reward={reward + low_level_reward}, next_state={next_state}, next_goal={self.next_goal}")
 
                 if recorder is not None:
+                    print(f"Recording frame {step}")
                     recorder.capture_frame()
 
                 state = deepcopy(next_state)

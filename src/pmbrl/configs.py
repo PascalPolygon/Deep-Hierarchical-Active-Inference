@@ -90,12 +90,13 @@ class DebugConfig(Config):
     def __init__(self):
         super().__init__()
         self.env_name = "Pendulum-v0"
-        self.n_episodes = 3
+        self.n_episodes = 5
         self.n_train_epochs = 200
         self.max_episode_len = 10
         self.hidden_size = 64
         self.plan_horizon = 5
         self.context_length = 2
+        self.record_every = 1
 
 
 class MountainCarConfig(Config):

@@ -21,8 +21,6 @@ from pmbrl import get_config
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-# TODO: Ensure we're only using torch tensors and not numpy arrays throughout the codebase
-
 
 def main(args):
     logger = Logger(args.logdir, args.seed)
@@ -87,42 +85,6 @@ def main(args):
         action_noise_scale=args.action_noise_scale,
         device=DEVICE,
     )
-
-    # low_level_planner = LowLevelPlanner(
-    #     ensemble=ensemble,
-    #     reward_model=reward_model,
-    #     action_size=action_size,
-    #     ensemble_size=args.ensemble_size,
-    #     plan_horizon=args.context_length,
-    #     optimisation_iters=args.optimisation_iters,
-    #     n_candidates=args.n_candidates,
-    #     top_candidates=args.top_candidates,
-    #     use_reward=args.use_reward,
-    #     use_exploration=args.use_exploration,
-    #     use_mean=args.use_mean,
-    #     expl_scale=args.expl_scale,
-    #     reward_scale=args.reward_scale,
-    #     strategy=args.strategy,
-    #     device=DEVICE,
-    # )
-
-    # planner = Planner(
-    #     ensemble,
-    #     reward_model,
-    #     action_size,
-    #     args.ensemble_size,
-    #     plan_horizon=args.plan_horizon,
-    #     optimisation_iters=args.optimisation_iters,
-    #     n_candidates=args.n_candidates,
-    #     top_candidates=args.top_candidates,
-    #     use_reward=args.use_reward,
-    #     use_exploration=args.use_exploration,
-    #     use_mean=args.use_mean,
-    #     expl_scale=args.expl_scale,
-    #     reward_scale=args.reward_scale,
-    #     strategy=args.strategy,
-    #     device=DEVICE,
-    # )
     agent = HierarchicalAgent(env, high_level_planner, low_level_planner, logger=logger)
 
     trainer = HierarchicalTrainer(
@@ -143,6 +105,8 @@ def main(args):
     msg = "\nCollected seeds: [{} episodes | {} frames]"
     logger.log(msg.format(args.n_seed_episodes, buffer.total_steps))
 
+    print(f'Recording every {args.record_every} episodes')
+
     for episode in range(1, args.n_episodes):
         logger.log("\n=== Episode {} ===".format(episode))
         start_time = time.time()
@@ -156,7 +120,9 @@ def main(args):
         recorder = None
         if args.record_every is not None and args.record_every % episode == 0:
             filename = logger.get_video_path(episode)
+            print(f"Instantiating recorder: {filename}")
             recorder = VideoRecorder(env.unwrapped, path=filename)
+            print(recorder)
             logger.log("Setup recoder @ {}".format(filename))
 
         logger.log("\n=== Collecting data [{}] ===".format(episode))
