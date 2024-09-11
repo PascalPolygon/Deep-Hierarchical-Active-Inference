@@ -139,11 +139,19 @@ class HierarchicalAgent(object):
 
                 if recorder is not None:
                     # Capture the frame for video
-                    print(f"Recording frame {step}")
+                    print(f"Recording frame {step}, done: {done}")
+
                     recorder.capture_frame()
 
+                    # modes = self.env.unwrapped.metadata.get('render.modes', [])
+                    # print(f"Render modes: {modes}")
+
                     # Save the frame as an individual image
-                    frame = self.env.render(mode="rgb_array")  # Get the frame as an RGB array
+                    frame = self.env.unwrapped.render(mode="rgb_array")  # Get the frame as an RGB array
+                    # frame = self.env.render()  #
+                    # print(self.env.render(mode='rgb_array', close=False))
+                   
+                    # frame = None
                     if frame is not None:
                         img = Image.fromarray(frame)
                         img.save(f"{folder_name}/frame_{step}.png")  # Save the image
