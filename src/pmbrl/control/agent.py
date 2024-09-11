@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 from PIL import Image
 import os
+import cv2
+from PIL import Image, ImageDraw
 
 # TODO: Ensure we're only using torch tensors and not numpy arrays
 class HierarchicalAgent(object):
@@ -104,6 +106,14 @@ class HierarchicalAgent(object):
         done = False
         step = 0
 
+        # Check the environment for max episode length
+        if hasattr(self.env.unwrapped, '_max_episode_steps'):
+            max_episode_length = self.env.unwrapped._max_episode_steps
+        else:
+            max_episode_length = "Unknown"
+
+        print(f"Max episode length: {max_episode_length}")
+
         # Prepare folder for saving frames
         if recorder is not None:
             folder_name = os.path.splitext(recorder.path)[0]  # Remove extension from video path
@@ -114,7 +124,12 @@ class HierarchicalAgent(object):
 
             while not done:
                 if step % self.context_length == 0:
+                    # Sample new high-level goal from the planner at the beginning of each context
                     self.current_goal = self.high_level_planner(state)
+
+                    print(f"Context length: {self.context_length}")
+                    print(f"New goal at step: {step} - {self.current_goal}")
+                    print(f"Current state: {state}")
 
                     if step > 0:
                         corrected_goal = self.off_policy_goal_correction(buffer, state, exploration_scale=self.high_level_planner.expl_scale)
@@ -136,29 +151,17 @@ class HierarchicalAgent(object):
 
                 if buffer is not None:
                     buffer.add(deepcopy(state), deepcopy(self.current_goal), action, reward, deepcopy(next_state), deepcopy(self.next_goal))
-
+         
                 if recorder is not None:
                     # Capture the frame for video
                     print(f"Recording frame {step}, done: {done}")
 
                     recorder.capture_frame()
 
-                    # modes = self.env.unwrapped.metadata.get('render.modes', [])
-                    # print(f"Render modes: {modes}")
-
-                    # Save the frame as an individual image
-                    frame = self.env.unwrapped.render(mode="rgb_array")  # Get the frame as an RGB array
-                    # frame = self.env.render()  #
-                    # print(self.env.render(mode='rgb_array', close=False))
-                   
-                    # frame = None
-                    if frame is not None:
-                        img = Image.fromarray(frame)
-                        img.save(f"{folder_name}/frame_{step}.png")  # Save the image
-                    else:
-                        print(f"Warning: Frame {step} could not be rendered.")
-
                 state = deepcopy(next_state)
+
+                self.render_and_save_frame(state, action, folder_name, step)
+
                 self.current_goal = deepcopy(self.next_goal)
                 step += 1
 
@@ -279,6 +282,120 @@ class HierarchicalAgent(object):
 
         # return best_goal
         return best_goal[0][0]
+    
+
+    def render_and_save_frame(self, state, action, folder_name, step):
+        """
+        Render the current frame, paint the goal and markers, and save the image.
+
+        Args:
+        state: Current state of the environment
+        folder_name: Directory to save the frames
+        step: Current step number
+        """
+        # Render the frame
+        frame = self.env.unwrapped.render(mode="rgb_array")
+        goal = self.current_goal
+
+        if frame is not None:
+            img = Image.fromarray(frame)
+            draw = ImageDraw.Draw(img)
+
+            # Get frame dimensions
+            height, width = frame.shape[:2]
+
+            # Correct calculation for the goal state using cos(theta) and sin(theta)
+            # We assume the goal is represented in the same way as the pendulum's state: [cos(goal_theta), sin(goal_theta)]
+            goal_theta = np.arctan2(goal[1], goal[0])
+
+            # Flip the sign of goal_theta to correct the orientation
+            goal_theta = -goal_theta
+
+            # Calculate goal position in the image
+            goal_x = int(width / 2 + np.sin(goal_theta) * (height / 4))  # Similar logic to the pendulum's x position
+            goal_y = int(height / 2 - np.cos(goal_theta) * (height / 4))  # Similar logic to the pendulum's y position
+
+            # Draw the goal state on the image (green)
+            draw.ellipse([goal_x-5, goal_y-5, goal_x+5, goal_y+5], fill=(0, 255, 0), outline=(0, 255, 0))
+
+            # Draw markers at (0,0) and (1000,1000) (red) - Reference points
+            draw.ellipse([0-5, 0-5, 0+5, 0+5], fill=(255, 0, 0), outline=(255, 0, 0))
+            draw.ellipse([1000-5, 1000-5, 1000+5, 1000+5], fill=(255, 0, 0), outline=(255, 0, 0))
+
+            # Corrected calculation for the pendulum's free end (orange)
+            # For Pendulum-v0, state[0] is cos(theta), state[1] is sin(theta)
+            theta = np.arctan2(state[1], state[0])
+
+            # Flip the sign of theta to correct the orientation
+            theta = -theta
+
+            # Calculate pendulum's free end position, bringing the orange dot closer by reducing the height scaling
+            pendulum_x = int(width / 2 + np.sin(theta) * (height / 4))  # Reduced length factor from height / 3 to height / 4
+            pendulum_y = int(height / 2 - np.cos(theta) * (height / 4))  # Reduced length factor here as well
+
+            # Debugging print statements to check positions
+            print(f"Step: {step}, Pendulum position: ({pendulum_x}, {pendulum_y}), State: {state}, Action: {action}")
+            print(f'Goal position: ({goal_x}, {goal_y}), Goal state : {self.current_goal}')
+
+            # Draw the current state (pendulum's free end) (orange)
+            draw.ellipse([pendulum_x-5, pendulum_y-5, pendulum_x+5, pendulum_y+5], fill=(255, 165, 0), outline=(255, 165, 0))
+
+            # Save the modified frame as an image
+            img.save(f"{folder_name}/frame_{step}.png")
+        else:
+            print(f"Warning: Frame {step} could not be rendered.")
+
+
+
+
+    # def render_and_save_frame(self, state, folder_name, step):
+    #     """
+    #     Render the current frame, paint the goal and markers, and save the image.
+        
+    #     Args:
+    #     state: Current state of the environment
+    #     folder_name: Directory to save the frames
+    #     step: Current step number
+    #     """
+    #     # Render the frame
+    #     frame = self.env.unwrapped.render(mode="rgb_array")
+    #     goal = self.current_goal
+        
+    #     if frame is not None:
+    #         img = Image.fromarray(frame)
+    #         draw = ImageDraw.Draw(img)
+            
+    #         # Convert the goal state to pixel coordinates (you may need to adjust this conversion)
+    #         height, width = frame.shape[:2]
+    #         goal_x = int((goal[0] + np.pi) / (2 * np.pi) * width)
+    #         goal_y = int((goal[1] + 8) / 16 * height)
+            
+    #         # Draw the goal state on the image (green)
+    #         draw.ellipse([goal_x-5, goal_y-5, goal_x+5, goal_y+5], fill=(0, 255, 0), outline=(0, 255, 0))
+            
+    #         # Draw markers at (0,0) and (1000,1000) (red)
+    #         draw.ellipse([0-5, 0-5, 0+5, 0+5], fill=(255, 0, 0), outline=(255, 0, 0))
+    #         draw.ellipse([1000-5, 1000-5, 1000+5, 1000+5], fill=(255, 0, 0), outline=(255, 0, 0))
+            
+    #         # Draw the current state (pendulum's free end) (orange)
+    #         # For Pendulum-v0, state[0] is cos(theta), state[1] is sin(theta)
+    #         theta = np.arctan2(state[1], state[0])
+    #         pendulum_x = int(width / 2 + np.sin(theta) * height / 3)
+    #         pendulum_y = int(height / 2 + np.cos(theta) * height / 3)
+    #         draw.ellipse([pendulum_x-5, pendulum_y-5, pendulum_x+5, pendulum_y+5], fill=(255, 165, 0), outline=(255, 165, 0))
+            
+    #         # Save the modified frame as an image
+    #         img.save(f"{folder_name}/frame_{step}.png")
+    #     else:
+    #         print(f"Warning: Frame {step} could not be rendered.")
+
+
+    def state_to_pixel(self, state, frame_shape):
+        # This is a placeholder implementation. You need to adjust this based on your environment.
+        height, width = frame_shape[:2]
+        x = int(state[0] * width)  # Assuming state[0] is normalized between 0 and 1
+        y = int(state[1] * height)  # Assuming state[1] is normalized between 0 and 1
+        return (x, y)
 
 
 

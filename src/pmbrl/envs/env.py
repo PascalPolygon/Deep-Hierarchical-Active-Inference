@@ -26,10 +26,14 @@ class GymEnv(object):
 
     def step(self, action):
         reward = 0
-        for _ in range(self.action_repeat):
+        for i in range(self.action_repeat):
             state, reward_k, done, info = self._env.step(action)
             reward += reward_k
-            self.t += 1
+            # self.t += 1
+            if i == self.action_repeat - 1:
+                self.t += 1 # Only increment t once per action
+            print(f"self t: {self.t} / max_episode_len: {self.max_episode_len}")
+
             done = done or self.t == self.max_episode_len
             if done:
                 self.done = True

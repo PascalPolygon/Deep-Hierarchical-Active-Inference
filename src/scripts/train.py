@@ -36,6 +36,7 @@ def main(args):
     if torch.cuda.is_available():
         torch.cuda.manual_seed(args.seed)
 
+    print(f'Max episode length: {args.max_episode_len}')
     env = GymEnv(
         args.env_name, args.max_episode_len, action_repeat=args.action_repeat, seed=args.seed
     )
@@ -85,7 +86,7 @@ def main(args):
         action_noise_scale=args.action_noise_scale,
         device=DEVICE,
     )
-    agent = HierarchicalAgent(env, high_level_planner, low_level_planner, logger=logger)
+    agent = HierarchicalAgent(env, high_level_planner, low_level_planner, context_length=args.context_length, logger=logger)
 
     trainer = HierarchicalTrainer(
         high_level_ensemble_model=ensemble,
