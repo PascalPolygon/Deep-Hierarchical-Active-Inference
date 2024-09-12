@@ -231,147 +231,149 @@ class EnsembleModel(nn.Module):
         delta_var = self.normalizer.denormalize_state_delta_vars(delta_var)
         return delta_mean, delta_var
 
-class LowLevelEnsembleModel(nn.Module):
-    """
-    Low-level ensemble model that predicts state changes given the current state and action.
-    """
+# class LowLevelEnsembleModel(nn.Module):
+#     """
+#     Low-level ensemble model that predicts state changes given the current state and action.
+#     """
 
-    def __init__(self, state_size, action_size, hidden_size, ensemble_size, normalizer, device="cpu"):
-        """
-        Initialize the LowLevelEnsembleModel.
+#     def __init__(self, state_size, action_size, hidden_size, ensemble_size, normalizer, device="cpu"):
+#         """
+#         Initialize the LowLevelEnsembleModel.
 
-        Args:
-            state_size (int): Dimension of the state space.
-            action_size (int): Dimension of the action space.
-            hidden_size (int): Dimension of the hidden layers.
-            ensemble_size (int): Number of ensemble members.
-            normalizer (Normalizer): Normalizer for the input data.
-            device (str): Device to run the model on ("cpu" or "cuda").
-        """
-        super().__init__()
-        self.fc_1 = EnsembleDenseLayer(state_size + action_size, hidden_size, ensemble_size, act_fn="swish")
-        self.fc_2 = EnsembleDenseLayer(hidden_size, hidden_size, ensemble_size, act_fn="swish")
-        self.fc_3 = EnsembleDenseLayer(hidden_size, hidden_size, ensemble_size, act_fn="swish")
-        self.fc_4 = EnsembleDenseLayer(hidden_size, state_size * 2, ensemble_size, act_fn="linear")
+#         Args:
+#             state_size (int): Dimension of the state space.
+#             action_size (int): Dimension of the action space.
+#             hidden_size (int): Dimension of the hidden layers.
+#             ensemble_size (int): Number of ensemble members.
+#             normalizer (Normalizer): Normalizer for the input data.
+#             device (str): Device to run the model on ("cpu" or "cuda").
+#         """
+#         super().__init__()
+#         self.fc_1 = EnsembleDenseLayer(state_size + action_size, hidden_size, ensemble_size, act_fn="swish")
+#         self.fc_2 = EnsembleDenseLayer(hidden_size, hidden_size, ensemble_size, act_fn="swish")
+#         self.fc_3 = EnsembleDenseLayer(hidden_size, hidden_size, ensemble_size, act_fn="swish")
+#         self.fc_4 = EnsembleDenseLayer(hidden_size, state_size * 2, ensemble_size, act_fn="linear")
 
-        self.ensemble_size = ensemble_size
-        self.normalizer = normalizer
-        self.device = device
-        self.max_logvar = -1
-        self.min_logvar = -5
-        self.to(device)
+#         self.ensemble_size = ensemble_size
+#         self.normalizer = normalizer
+#         self.device = device
+#         self.max_logvar = -1
+#         self.min_logvar = -5
+#         self.to(device)
 
-    def forward(self, states, actions):
-        """
-        Forward pass through the low-level ensemble model.
+#     def forward(self, states, actions):
+#         """
+#         Forward pass through the low-level ensemble model.
 
-        Args:
-            states (torch.Tensor): Input states.
-            actions (torch.Tensor): Input actions.
+#         Args:
+#             states (torch.Tensor): Input states.
+#             actions (torch.Tensor): Input actions.
 
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor]: Mean and variance of the predicted state deltas.
-        """
-        norm_states, norm_actions = self._pre_process_model_inputs(states, actions)
-        norm_delta_mean, norm_delta_var = self._propagate_network(norm_states, norm_actions)
-        delta_mean, delta_var = self._post_process_model_outputs(norm_delta_mean, norm_delta_var)
-        return delta_mean, delta_var
+#         Returns:
+#             Tuple[torch.Tensor, torch.Tensor]: Mean and variance of the predicted state deltas.
+#         """
+#         norm_states, norm_actions = self._pre_process_model_inputs(states, actions)
+#         norm_delta_mean, norm_delta_var = self._propagate_network(norm_states, norm_actions)
+#         delta_mean, delta_var = self._post_process_model_outputs(norm_delta_mean, norm_delta_var)
+#         return delta_mean, delta_var
 
-    def loss(self, states, actions, state_deltas):
-        """
-        Compute the loss for the low-level ensemble model.
+#     def loss(self, states, actions, state_deltas):
+#         """
+#         Compute the loss for the low-level ensemble model.
 
-        Args:
-            states (torch.Tensor): Input states.
-            actions (torch.Tensor): Input actions.
-            state_deltas (torch.Tensor): Target state deltas.
+#         Args:
+#             states (torch.Tensor): Input states.
+#             actions (torch.Tensor): Input actions.
+#             state_deltas (torch.Tensor): Target state deltas.
 
-        Returns:
-            torch.Tensor: Loss value.
-        """
-        states, actions = self._pre_process_model_inputs(states, actions)
-        delta_targets = self._pre_process_model_targets(state_deltas)
-        delta_mu, delta_var = self._propagate_network(states, actions)
-        loss = (delta_mu - delta_targets) ** 2 / delta_var + torch.log(delta_var)
-        loss = loss.mean(-1).mean(-1).sum()
-        return loss
+#         Returns:
+#             torch.Tensor: Loss value.
+#         """
+#         states, actions = self._pre_process_model_inputs(states, actions)
+#         delta_targets = self._pre_process_model_targets(state_deltas)
+#         delta_mu, delta_var = self._propagate_network(states, actions)
+#         loss = (delta_mu - delta_targets) ** 2 / delta_var + torch.log(delta_var)
+#         loss = loss.mean(-1).mean(-1).sum()
+#         return loss
 
-    def sample(self, mean, var):
-        return Normal(mean, torch.sqrt(var)).sample()
+#     def sample(self, mean, var):
+#         return Normal(mean, torch.sqrt(var)).sample()
 
-    def reset_parameters(self):
-        self.fc_1.reset_parameters()
-        self.fc_2.reset_parameters()
-        self.fc_3.reset_parameters()
-        self.fc_4.reset_parameters()
-        self.to(self.device)
+#     def reset_parameters(self):
+#         self.fc_1.reset_parameters()
+#         self.fc_2.reset_parameters()
+#         self.fc_3.reset_parameters()
+#         self.fc_4.reset_parameters()
+#         self.to(self.device)
 
-    def _propagate_network(self, states, actions):
-        """
-        Forward pass through the network layers.
+#     def _propagate_network(self, states, actions):
+#         """
+#         Forward pass through the network layers.
 
-        Args:
-            states (torch.Tensor): Normalized states.
-            actions (torch.Tensor): Normalized actions.
+#         Args:
+#             states (torch.Tensor): Normalized states.
+#             actions (torch.Tensor): Normalized actions.
 
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor]: Mean and variance of the state deltas.
-        """
-        inp = torch.cat((states, actions), dim=2)  # Concatenate states and actions
-        op = self.fc_1(inp)  # First hidden layer
-        op = self.fc_2(op)   # Second hidden layer
-        op = self.fc_3(op)   # Third hidden layer
-        op = self.fc_4(op)   # Output layer
+#         Returns:
+#             Tuple[torch.Tensor, torch.Tensor]: Mean and variance of the state deltas.
+#         """
+#         inp = torch.cat((states, actions), dim=2)  # Concatenate states and actions
+#         op = self.fc_1(inp)  # First hidden layer
+#         op = self.fc_2(op)   # Second hidden layer
+#         op = self.fc_3(op)   # Third hidden layer
+#         op = self.fc_4(op)   # Output layer
 
-        delta_mean, delta_logvar = torch.split(op, op.size(2) // 2, dim=2)
-        delta_logvar = torch.sigmoid(delta_logvar)
-        delta_logvar = self.min_logvar + (self.max_logvar - self.min_logvar) * delta_logvar
-        delta_var = torch.exp(delta_logvar)
+#         delta_mean, delta_logvar = torch.split(op, op.size(2) // 2, dim=2)
+#         delta_logvar = torch.sigmoid(delta_logvar)
+#         delta_logvar = self.min_logvar + (self.max_logvar - self.min_logvar) * delta_logvar
+#         delta_var = torch.exp(delta_logvar)
 
-        return delta_mean, delta_var
+#         return delta_mean, delta_var
 
-    def _pre_process_model_inputs(self, states, actions):
-        """
-        Normalize the states and actions.
+#     def _pre_process_model_inputs(self, states, actions):
+#         """
+#         Normalize the states and actions.
 
-        Args:
-            states (torch.Tensor): Input states.
-            actions (torch.Tensor): Input actions.
+#         Args:
+#             states (torch.Tensor): Input states.
+#             actions (torch.Tensor): Input actions.
 
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor]: Normalized states and actions.
-        """
-        states = self.normalizer.normalize_states(states)
-        actions = self.normalizer.normalize_actions(actions)
-        return states, actions
+#         Returns:
+#             Tuple[torch.Tensor, torch.Tensor]: Normalized states and actions.
+#         """
+#         states = self.normalizer.normalize_states(states)
+#         actions = self.normalizer.normalize_actions(actions)
+#         return states, actions
 
-    def _pre_process_model_targets(self, state_deltas):
-        """
-        Normalize the target state deltas.
+#     def _pre_process_model_targets(self, state_deltas):
+#         """
+#         Normalize the target state deltas.
 
-        Args:
-            state_deltas (torch.Tensor): Target state deltas.
+#         Args:
+#             state_deltas (torch.Tensor): Target state deltas.
 
-        Returns:
-            torch.Tensor: Normalized target state deltas.
-        """
-        return self.normalizer.normalize_state_deltas(state_deltas)
+#         Returns:
+#             torch.Tensor: Normalized target state deltas.
+#         """
+#         return self.normalizer.normalize_state_deltas(state_deltas)
 
-    def _post_process_model_outputs(self, delta_mean, delta_var):
-        """
-        Denormalize the model outputs (mean and variance of state deltas).
+#     def _post_process_model_outputs(self, delta_mean, delta_var):
+#         """
+#         Denormalize the model outputs (mean and variance of state deltas).
 
-        Args:
-            delta_mean (torch.Tensor): Predicted mean state deltas.
-            delta_var (torch.Tensor): Predicted variance of state deltas.
+#         Args:
+#             delta_mean (torch.Tensor): Predicted mean state deltas.
+#             delta_var (torch.Tensor): Predicted variance of state deltas.
 
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor]: Denormalized mean and variance.
-        """
-        delta_mean = self.normalizer.denormalize_state_delta_means(delta_mean)
-        delta_var = self.normalizer.denormalize_state_delta_vars(delta_var)
-        return delta_mean, delta_var
+#         Returns:
+#             Tuple[torch.Tensor, torch.Tensor]: Denormalized mean and variance.
+#         """
+#         delta_mean = self.normalizer.denormalize_state_delta_means(delta_mean)
+#         delta_var = self.normalizer.denormalize_state_delta_vars(delta_var)
+#         return delta_mean, delta_var
 
+# TODO: This RewardModel really only seems to be a goal reard model (Predicting the reward of a goal)
+#  Do we need to pass in states as well? Rethink conceptually about this
 class RewardModel(nn.Module):
     def __init__(self, in_size, hidden_size, act_fn="relu", device="cpu"):
         super().__init__()
@@ -412,29 +414,42 @@ class ActionModel(nn.Module):
         self.to(device)
 
     def forward(self, state, goal):
-          # Convert state and goal to tensors if they are numpy arrays
-        # Debugging: Print the shapes of state and goal
-        # print(f"State shape: {state.shape}, Goal shape: {goal.shape}")
         x = torch.cat([state, goal], dim=-1)
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
         action = torch.tanh(self.fc3(x))  # Use tanh to bound the action space
         return action
 
-    # def loss(self, states, goals, actions):
-    #     predicted_actions = self.forward(states, goals)
-    #     return F.mse_loss(predicted_actions, actions)
+    def loss(self, states, goals, rewards, ensemble, distance_weight=1.0, reward_weight=1.0):
+        """
+        Compute the loss for the low-level action model based on both
+        the distance to the goal and the predicted reward.
 
-    def loss(self, states, goals, ensemble):
+        Args:
+            states (torch.Tensor): Current states.
+            goals (torch.Tensor): Desired goals.
+            rewards (torch.Tensor): Observed rewards.
+            ensemble (nn.Module): High-level ensemble model.
+            distance_weight (float): Weight for the distance loss term.
+            reward_weight (float): Weight for the reward prediction loss term.
 
+        Returns:
+            torch.Tensor: The computed loss.
+        """
         # Predict the action using the current state and goal
         predicted_actions = self.forward(states, goals)
 
         # Predict the next state given the current state and the predicted action
         predicted_next_states, _ = ensemble(states, predicted_actions)
 
-        # Calculate the distance between the predicted next state and the goal
-        loss = torch.norm(predicted_next_states - goals, p=2, dim=-1).mean()
+        # Calculate the distance loss (penalizing for being far from the goal)
+        distance_loss = -torch.norm(predicted_next_states - goals, p=2, dim=-1).mean()
+
+        # Calculate the reward loss (penalizing for incorrect reward prediction)
+        reward_loss = torch.norm(rewards - predicted_actions, p=2, dim=-1).mean()
+
+        # Total loss is a weighted combination of the distance loss and reward loss
+        loss = distance_weight * distance_loss + reward_weight * reward_loss
 
         return loss
 

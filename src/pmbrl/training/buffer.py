@@ -175,10 +175,9 @@ class Buffer(object):
             batch_size (int): The size of the batches to return.
 
         Yields:
-            Tuple of torch.Tensor: Batches of states, goals, and actions.
+            Tuple of torch.Tensor: Batches of states, goals, actions, and rewards.
         """
         size = len(self.low_level_states)
-        # print("Size of low-level states: ", size)
         
         # Create indices with permutation for each ensemble member
         indices = [
@@ -192,19 +191,22 @@ class Buffer(object):
                 return
 
             batch_size = j - i
-            batch_indices = indices[i:j].flatten()  # Flattening the batch indices
+            batch_indices = indices[i:j].flatten()
 
             # Fetch and convert to tensors
             states = torch.from_numpy(self.low_level_states[batch_indices]).float().to(self.device)
             goals = torch.from_numpy(self.low_level_goals[batch_indices]).float().to(self.device)
             actions = torch.from_numpy(self.low_level_actions[batch_indices]).float().to(self.device)
+            rewards = torch.from_numpy(self.low_level_rewards[batch_indices]).float().to(self.device)
 
             # Reshape for ensemble processing
             states = states.reshape(self.ensemble_size, batch_size, self.state_size)
             goals = goals.reshape(self.ensemble_size, batch_size, self.goal_size)
             actions = actions.reshape(self.ensemble_size, batch_size, self.action_size)
+            rewards = rewards.reshape(self.ensemble_size, batch_size, 1)
 
-            yield states, goals, actions
+            yield states, goals, actions, rewards
+
 
 
     def get_high_level_train_batches(self, batch_size):
@@ -238,6 +240,8 @@ class Buffer(object):
             states = torch.from_numpy(np.array(self.high_level_states)[batch_indices]).float().to(self.device)
             goals = torch.from_numpy(np.array(self.high_level_goals)[batch_indices]).float().to(self.device)
             rewards = torch.from_numpy(np.array(self.high_level_rewards)[batch_indices]).float().to(self.device)
+            # TODO: These goal deltas are just state deltas, right? Rethink conepetually about what a goal delta is based on the 
+            #  original paper
             goal_deltas = torch.from_numpy(np.array(self.high_level_next_states)[batch_indices] - np.array(self.high_level_states)[batch_indices]).float().to(self.device)
 
             if self.signal_noise is not None:

@@ -133,33 +133,37 @@ class HierarchicalTrainer(object):
             a_losses (list): List to store action model losses.
             n_batches (list): List to store the number of batches per epoch.
         """
-        for (states, goals, _s) in self.buffer.get_low_level_train_batches(self.batch_size):
+        for (states, goals, _, rewards) in self.buffer.get_low_level_train_batches(self.batch_size):
             self.low_level_action.train()
 
             # Zero the gradients for the low-level action model
             self.low_level_optim.zero_grad()
 
-            # Compute loss for the low-level action model
-            a_loss = self.low_level_action.loss(states, goals, self.high_level_ensemble)
+            # Compute loss for the low-level action model, passing rewards as well
+            #TODO: Experimetn with different weights for distance and reward
+            #  Intuitively it makes sense that for goal driven tasks (Where we have a goal state with max reward like pendulum)
+            #  The distance_weight should dominiate as we care more about reaching the goal
+            #  But for a task where there is no final max reward goal state then focusing onf the rewared_mdoel might be better
+            a_loss = self.low_level_action.loss(states, goals, rewards, self.high_level_ensemble, distance_weight=0.2, reward_weight=0.8)
 
             # Backpropagate the loss
             a_loss.backward()
-            
+
             # Clip gradients to prevent exploding gradients
             torch.nn.utils.clip_grad_norm_(self.low_level_params, self.grad_clip_norm, norm_type=2)
-            
+
             # Perform a gradient update step
             self.low_level_optim.step()
 
             a_losses[epoch - 1].append(a_loss.item())
             n_batches[epoch - 1] += 1
 
-
         # Log the average loss every 20 epochs
         if self.logger is not None and epoch % 20 == 0:
             avg_a_loss = self._get_avg_loss(a_losses, n_batches, epoch)
             message = "> Low-Level Train epoch {} [action {:.2f}]"
             self.logger.log(message.format(epoch, avg_a_loss))
+
 
     def reset_models(self):
         """
