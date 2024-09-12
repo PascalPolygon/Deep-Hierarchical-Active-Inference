@@ -132,7 +132,9 @@ class HierarchicalAgent(object):
                     print(f"Current state: {state}")
 
                     if step > 0:
-                        corrected_goal = self.off_policy_goal_correction(buffer, state, exploration_scale=self.high_level_planner.expl_scale)
+                        # corrected_goal = self.off_policy_goal_correction(buffer, state, exploration_scale=self.high_level_planner.expl_scale)
+                        corrected_goal = self.current_goal
+                        print(f"Corrected goal at step: {step} - {corrected_goal}")
                         buffer.update(corrected_goal)
 
                 action, low_level_reward = self.low_level_planner(state, self.current_goal)

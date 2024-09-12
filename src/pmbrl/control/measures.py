@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from scipy.special import psi, gamma
 
-
+#  TODO: Analyze carefully and write down use and mathematical explaination of each measure
 class Random(object):
     def __init__(self, model, scale=1.0):
         self.model = model

@@ -150,8 +150,36 @@ class HighLevelPlanner(nn.Module):
             best_goals.std(dim=1, unbiased=False, keepdim=True),
         )
 
+        # Bayesian updating step
+        # Get the maximum reward state from the environment
+        max_reward_state = torch.tensor(self.env.max_reward_state, 
+                                        dtype=torch.float32, 
+                                        device=self.device)
+        print(f'Max reward state: {max_reward_state}')
+        
+        # Reshape max_reward_state to match goal_mean shape
+        prior_mean = max_reward_state.view(1, 1, -1).expand(self.plan_horizon, 1, -1)
+        
+        # Reduce prior variance to increase its influence
+        prior_var = torch.ones_like(prior_mean) / 4  # Reduced variance increases confidence
+        print(f'Prior mean: {prior_mean}')
+        print(f'Prior var: {prior_var}')
+
+        likelihood_mean = goal_mean
+        likelihood_var = goal_std_dev.pow(2)
+        print(f'Likelihood mean: {likelihood_mean}')
+
+        # Compute posterior mean and variance
+        posterior_var = 1 / (1/prior_var + 1/likelihood_var)
+        posterior_mean = posterior_var * (prior_mean/prior_var + likelihood_mean/likelihood_var)
+
+        # Increase the weight of the prior in the posterior calculation
+        prior_weight = 0.7  # Adjust this value to control prior influence
+        posterior_mean = prior_weight * prior_mean + (1 - prior_weight) * posterior_mean
+
+        print(f'Posterior mean: {posterior_mean}')
         # Return the refined mean and standard deviation for the goal distribution
-        return goal_mean, goal_std_dev
+        return posterior_mean, posterior_var.sqrt()
 
     def return_stats(self):
         if self.use_reward:
